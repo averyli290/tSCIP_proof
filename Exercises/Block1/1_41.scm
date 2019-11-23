@@ -1,0 +1,6 @@
+;(define test1 '(1 3 (5 7) 9))
+;(define test2 '((7)))
+;(define test3 '(1 (2 (3 (4 (5 (6 7)))))))
+(car (cdaddr test1))
+(caar test2)
+(cadadr (cadadr (cadadr test3)))

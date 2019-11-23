@@ -1,0 +1,11 @@
+(define (fold-left f start-value l)
+    (define (iter l)
+        (if (null? (cdr l))
+            car (l)
+            (f (car l) (iter (cdr l)))
+            )
+        )
+    (f start-value (iter l))
+    )
+
+;(fold-left - 0 '(1 2 3))

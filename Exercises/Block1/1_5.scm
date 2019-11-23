@@ -1,0 +1,1 @@
+In a "special" function, not all of the inputs are necessarily evaluted, whiel in our newly created one, that isn't the case. If the second else-clause cannot be evaluated, it will work in the original if, but not in our created one.

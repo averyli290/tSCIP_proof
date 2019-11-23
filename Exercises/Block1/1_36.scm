@@ -1,0 +1,12 @@
+(define (slice l n m)
+    (if (= n m)
+        (cons (car l) '())
+        (if (> n 0)
+            (slice (cdr l) (- n 1) (- m 1)) 
+            (cons (car l) (slice (cdr l) n (- m 1)))
+            )
+        )
+    )
+
+; (define test (list 1 2 3 4 5 6 7))
+; (slice test 0 6)
