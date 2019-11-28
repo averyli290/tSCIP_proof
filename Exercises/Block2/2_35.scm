@@ -15,6 +15,9 @@
 (define (get-tag tagged-object) (car tagged-object))
 (define (get-contents tagged-object) (cdr tagged-object))
 
+;;; DEFINING TOLERANCE as 0.00001
+(define tolerance 0.00001)
+
 
 ;;; LISP NUMBER PACKAGE
 
@@ -33,6 +36,7 @@
     (table-set 'sub '(lisp-number lisp-number) (lambda (a b) (set-tag '(lisp-number) (sub a b))))
     (table-set 'mul '(lisp-number lisp-number) (lambda (a b) (set-tag '(lisp-number) (mul a b))))
     (table-set 'div '(lisp-number lisp-number) (lambda (a b) (set-tag '(lisp-number) (div a b))))
+    (table-set 'eq? '(lisp-number lisp-number) (lambda (a b) (eq? a b)))
     
         'done)
 
@@ -54,6 +58,7 @@
     (define (sub-rat rat1 rat2) (make-rat (- (* (numer rat1) (denom rat2)) (* (numer rat2) (denom rat1))) (* (denom rat1) (denom rat2))))
     (define (mul-rat rat1 rat2) (make-rat (* (numer rat1) (numer rat2)) (* (denom rat1) (denom rat2))))
     (define (div-rat rat1 rat2) (make-rat (* (numer rat1) (denom rat2)) (* (denom rat1) (numer rat2))))
+    (define (eq? rat1 rat2) (and (= (numer rat1) (number rat2)) (= (denom rat1) (denom rat2))))
 
     ;; registration code 
     (table-set 'make-rat '(rational) (lambda (a b) (set-tag '(rational) (make-rat a b))))
@@ -61,6 +66,7 @@
     (table-set 'sub '(rational rational) (lambda (rat1 rat2) (set-tag '(rational) (sub-rat rat1 rat2))))
     (table-set 'mul '(rational rational) (lambda (rat1 rat2) (set-tag '(rational) (mul-rat rat1 rat2))))
     (table-set 'div '(rational rational) (lambda (rat1 rat2) (set-tag '(rational) (div-rat rat1 rat2))))
+    (table-set 'eq? '(rational rational) (lambda (rat1 rat2) (eq? rat1 rat2)))
 
         'done)
 
@@ -125,6 +131,7 @@
     (define (sub z1 z2) (make-complex-from-real-imag (- (real-part z1) (real-part z2)) (- (imag-part z1) (imag-part z2))))
     (define (mul z1 z2) (make-complex-from-mag-ang (* (magnitude z1) (magnitude z2)) (+ (angle z1) (angle z2))))
     (define (div z1 z2) (make-complex-from-mag-ang (/ (magnitude z1) (magnitude z2)) (- (angle z1) (angle z2))))
+    (define (eq? z1 z2) (and (< (- (real-part z1) (real-part z2)) tolerance) (< (- (real-part z1) (real-part z2)) tolerance)))
 
     ;; registration code 
     (table-set 'make-complex-from-real-imag '(complex) (lambda (a b) (set-tag '(complex) (make-complex-from-real-imag a b))))
@@ -133,6 +140,7 @@
     (table-set 'sub '(complex complex) (lambda (z1 z2) (set-tag '(complex) (sub z1 z2))))
     (table-set 'mul '(complex complex) (lambda (z1 z2) (set-tag '(complex) (mul z1 z2))))
     (table-set 'div '(complex complex) (lambda (z1 z2) (set-tag '(complex) (div z1 z2))))
+    (table-set 'eq? '(complex complex) (lambda (z1 z2) (eq? z1 z2)))
 
 
         'done)
@@ -154,17 +162,16 @@
 (define (make-complex-from-real-imag a b) (apply (table-get 'make-complex-from-real-imag '(complex)) (list a b)))
 (define (make-complex-from-mag-ang r theta) (apply (table-get 'make-complex-from-mag-ang '(complex)) (list r theta)))
 
+
 ;;; displaying table (for debugging purposes)
 (display table)
-
-;; Setting tolerance to 0.00001
-(define tolerance 0.00001)
 
 ;; level 2 fucntions with apply-generic
 (define (add n m) (apply-generic 'add n m))
 (define (subtract n m) (apply-generic 'sub n m))
 (define (multiply n m) (apply-generic 'mul n m))
 (define (divide n m) (apply-generic 'div n m))
+(define (eq? n m) (apply-generic 'eq? n m))
 
 ;;; TEST CODE (with all types of numbers)
 ;(define test-lisp-num (make-lisp-num 2))
