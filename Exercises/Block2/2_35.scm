@@ -28,7 +28,7 @@
     (define (sub a b) (- a b))
     (define (mul a b) (* a b))
     (define (div a b) (/ a b))
-    (define (eq? a b) (= a b))
+    (define (eq-num? a b) (< (- a b) tolerance))
     
     ;; registration code
     (table-set 'make-lisp-num '(lisp-number) (lambda (n) (set-tag '(lisp-number) (make-lisp-num n))))
@@ -36,7 +36,7 @@
     (table-set 'sub '(lisp-number lisp-number) (lambda (a b) (set-tag '(lisp-number) (sub a b))))
     (table-set 'mul '(lisp-number lisp-number) (lambda (a b) (set-tag '(lisp-number) (mul a b))))
     (table-set 'div '(lisp-number lisp-number) (lambda (a b) (set-tag '(lisp-number) (div a b))))
-    (table-set 'eq? '(lisp-number lisp-number) (lambda (a b) (eq? a b)))
+    (table-set 'eq-num? '(lisp-number lisp-number) (lambda (a b) (eq-num? a b)))
     
         'done)
 
@@ -58,7 +58,7 @@
     (define (sub-rat rat1 rat2) (make-rat (- (* (numer rat1) (denom rat2)) (* (numer rat2) (denom rat1))) (* (denom rat1) (denom rat2))))
     (define (mul-rat rat1 rat2) (make-rat (* (numer rat1) (numer rat2)) (* (denom rat1) (denom rat2))))
     (define (div-rat rat1 rat2) (make-rat (* (numer rat1) (denom rat2)) (* (denom rat1) (numer rat2))))
-    (define (eq? rat1 rat2) (and (= (numer rat1) (number rat2)) (= (denom rat1) (denom rat2))))
+    (define (eq-num? rat1 rat2) (< (- (/ (numer rat1) (denom rat1)) (/ (numer rat2) (denom rat2))) tolerance))
 
     ;; registration code 
     (table-set 'make-rat '(rational) (lambda (a b) (set-tag '(rational) (make-rat a b))))
@@ -66,7 +66,7 @@
     (table-set 'sub '(rational rational) (lambda (rat1 rat2) (set-tag '(rational) (sub-rat rat1 rat2))))
     (table-set 'mul '(rational rational) (lambda (rat1 rat2) (set-tag '(rational) (mul-rat rat1 rat2))))
     (table-set 'div '(rational rational) (lambda (rat1 rat2) (set-tag '(rational) (div-rat rat1 rat2))))
-    (table-set 'eq? '(rational rational) (lambda (rat1 rat2) (eq? rat1 rat2)))
+    (table-set 'eq-num? '(rational rational) (lambda (rat1 rat2) (eq-num? rat1 rat2)))
 
         'done)
 
@@ -131,7 +131,7 @@
     (define (sub z1 z2) (make-complex-from-real-imag (- (real-part z1) (real-part z2)) (- (imag-part z1) (imag-part z2))))
     (define (mul z1 z2) (make-complex-from-mag-ang (* (magnitude z1) (magnitude z2)) (+ (angle z1) (angle z2))))
     (define (div z1 z2) (make-complex-from-mag-ang (/ (magnitude z1) (magnitude z2)) (- (angle z1) (angle z2))))
-    (define (eq? z1 z2) (and (< (- (real-part z1) (real-part z2)) tolerance) (< (- (real-part z1) (real-part z2)) tolerance)))
+    (define (eq-num? z1 z2) (and (< (- (real-part z1) (real-part z2)) tolerance) (< (- (real-part z1) (real-part z2)) tolerance)))
 
     ;; registration code 
     (table-set 'make-complex-from-real-imag '(complex) (lambda (a b) (set-tag '(complex) (make-complex-from-real-imag a b))))
@@ -140,7 +140,7 @@
     (table-set 'sub '(complex complex) (lambda (z1 z2) (set-tag '(complex) (sub z1 z2))))
     (table-set 'mul '(complex complex) (lambda (z1 z2) (set-tag '(complex) (mul z1 z2))))
     (table-set 'div '(complex complex) (lambda (z1 z2) (set-tag '(complex) (div z1 z2))))
-    (table-set 'eq? '(complex complex) (lambda (z1 z2) (eq? z1 z2)))
+    (table-set 'eq-num? '(complex complex) (lambda (z1 z2) (eq-num? z1 z2)))
 
 
         'done)
@@ -171,7 +171,7 @@
 (define (subtract n m) (apply-generic 'sub n m))
 (define (multiply n m) (apply-generic 'mul n m))
 (define (divide n m) (apply-generic 'div n m))
-(define (eq? n m) (apply-generic 'eq? n m))
+(define (eq-num? n m) (apply-generic 'eq-num? n m))
 
 ;;; TEST CODE (with all types of numbers)
 ;(define test-lisp-num (make-lisp-num 2))
@@ -200,8 +200,8 @@
 
 
 ;;; test code
-(define a (make-lisp-num 14))
-(multiply a a) ;returns '(lisp-number 196)
-(define z (make-complex-from-real-imag 0.707 0.707)) ; 0.707 = 1/sqrt{2}
+;(define a (make-lisp-num 14))
+;(define b (make-rat 5 6))
+;(define c (make-rat 59 60))
+;(eq-num? b c)
 
-(multiply z z) ;returns approx '(complex polar 1 . 1.57)
