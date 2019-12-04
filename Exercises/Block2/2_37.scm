@@ -1,3 +1,5 @@
+(define num-tower (list 'integer 'rational 'real 'complex))
+
 ;;; set-up: table
 (define table '())
 (define (table-set name tag proc)
@@ -15,28 +17,17 @@
 (define (get-tag tagged-object) (car tagged-object))
 (define (get-contents tagged-object) (cdr tagged-object))
 
+;;; DEFINING TOLERANCE as 0.00001
+(define tolerance 0.00001)
 
-;;; LISP NUMBER PACKAGE
 
-(define (install-lisp-number-package)
-    ;; constructer and accessor code
-    (define (make-lisp-num n) n)
-    (define (add a b) (+ a b))
-    (define (sub a b) (- a b))
-    (define (mul a b) (* a b))
-    (define (div a b) (/ a b))
-    (define (eq? a b) (= a b))
-    
-    ;; registration code
-    (table-set 'make-lisp-num '(lisp-number) (lambda (n) (set-tag 'lisp-number (make-lisp-num n))))
-    (table-set 'add '(lisp-number lisp-number) (lambda (a b) (set-tag 'lisp-number (add a b))))
-    (table-set 'sub '(lisp-number lisp-number) (lambda (a b) (set-tag 'lisp-number (sub a b))))
-    (table-set 'mul '(lisp-number lisp-number) (lambda (a b) (set-tag 'lisp-number (mul a b))))
-    (table-set 'div '(lisp-number lisp-number) (lambda (a b) (set-tag 'lisp-number (div a b))))
-    
+;;; INTEGER PACKAGE
+
+(define (install-integer-package)
+    (define (make-integer x) (set-tag 'integer x))
+    (table-set 'make-integer '(integer) (lambda (x) (make-integer x)))
+    (table-set 'eq-num? '(integer integer) (lambda (n m) (= n m)))
         'done)
-
-
 
 ;;; RATIONAL NUMBERS PACKAGE
 
@@ -54,6 +45,7 @@
     (define (sub-rat rat1 rat2) (make-rat (- (* (numer rat1) (denom rat2)) (* (numer rat2) (denom rat1))) (* (denom rat1) (denom rat2))))
     (define (mul-rat rat1 rat2) (make-rat (* (numer rat1) (numer rat2)) (* (denom rat1) (denom rat2))))
     (define (div-rat rat1 rat2) (make-rat (* (numer rat1) (denom rat2)) (* (denom rat1) (numer rat2))))
+    (define (eq-num? rat1 rat2) (< (- (/ (numer rat1) (denom rat1)) (/ (numer rat2) (denom rat2))) tolerance))
 
     ;; registration code 
     (table-set 'make-rat '(rational) (lambda (a b) (set-tag 'rational (make-rat a b))))
@@ -61,9 +53,18 @@
     (table-set 'sub '(rational rational) (lambda (rat1 rat2) (set-tag 'rational (sub-rat rat1 rat2))))
     (table-set 'mul '(rational rational) (lambda (rat1 rat2) (set-tag 'rational (mul-rat rat1 rat2))))
     (table-set 'div '(rational rational) (lambda (rat1 rat2) (set-tag 'rational (div-rat rat1 rat2))))
+    (table-set 'eq-num? '(rational rational) (lambda (rat1 rat2) (eq-num? rat1 rat2)))
 
         'done)
 
+
+;;; REAL NUMBER PACKAGE
+
+(define (install-real-num-package)
+    (define (make-real-num x) (set-tag 'real-num x))
+    (table-set 'make-real-num '(real-num) (lambda (n) (make-real-num n)))
+    (table-set 'eq-num? '(real-num real-num) (lambda (n m) (< (- n m) tolerance)))
+        'done)
 
 
 ;;; COMPLEX NUMBERS PACKAGE
@@ -113,7 +114,7 @@
     (define (make-complex-from-real-imag a b) (apply (table-get 'make-from-real-imag '(rect)) (list a b)))
     (define (make-complex-from-mag-ang r theta) (apply (table-get 'make-from-mag-ang '(polar)) (list r theta)))
     
-    ;; defining for use in the level two procedures (only for complex here) (has to look up '(rect) and '(polar) so finding tag and putting it in a list for lookup)
+    ;; defining for use in the level two procedures (only for complex here)
     (define (apply-generic op . args) (apply (table-get op (list (get-tag (car args)))) (map get-contents args)))
     (define (real-part z) (apply-generic 'real-part z))
     (define (imag-part z) (apply-generic 'imag-part z))
@@ -125,6 +126,7 @@
     (define (sub z1 z2) (make-complex-from-real-imag (- (real-part z1) (real-part z2)) (- (imag-part z1) (imag-part z2))))
     (define (mul z1 z2) (make-complex-from-mag-ang (* (magnitude z1) (magnitude z2)) (+ (angle z1) (angle z2))))
     (define (div z1 z2) (make-complex-from-mag-ang (/ (magnitude z1) (magnitude z2)) (- (angle z1) (angle z2))))
+    (define (eq-num? z1 z2) (and (< (- (real-part z1) (real-part z2)) tolerance) (< (- (real-part z1) (real-part z2)) tolerance)))
 
     ;; registration code 
     (table-set 'make-complex-from-real-imag '(complex) (lambda (a b) (set-tag 'complex (make-complex-from-real-imag a b))))
@@ -133,68 +135,54 @@
     (table-set 'sub '(complex complex) (lambda (z1 z2) (set-tag 'complex (sub z1 z2))))
     (table-set 'mul '(complex complex) (lambda (z1 z2) (set-tag 'complex (mul z1 z2))))
     (table-set 'div '(complex complex) (lambda (z1 z2) (set-tag 'complex (div z1 z2))))
+    (table-set 'eq-num? '(complex complex) (lambda (z1 z2) (eq-num? z1 z2)))
 
 
         'done)
 
-
-
 ;;; INSTALLING PACKAGES
-(install-lisp-number-package)
+(install-integer-package)
 (install-rational-package)
+(install-real-num-package)
 (install-complex-package)
 
-;;; APPLY GENERIC 
-(define (apply-generic op . args)
-    (apply (table-get op (map get-tag args)) (map get-contents args)))
-
 ;;; OUTSIDE CONSTRUCTERS (FOR lisp-number, rational, complex rect and complex polar)
-(define (make-lisp-num a) ((table-get 'make-lisp-num '(lisp-number)) a))
+(define (make-integer a) ((table-get 'make-integer '(integer)) a))
 (define (make-rat numer denom) (apply (table-get 'make-rat '(rational)) (list numer denom)))
+(define (make-real-num a) ((table-get 'make-real-num '(real-num)) a))
 (define (make-complex-from-real-imag a b) (apply (table-get 'make-complex-from-real-imag '(complex)) (list a b)))
 (define (make-complex-from-mag-ang r theta) (apply (table-get 'make-complex-from-mag-ang '(complex)) (list r theta)))
 
-;;; displaying table (for debugging purposes)
-(display table)
+;;; RAISING FUNCTIONS
+;; defining the functions
+(define (raise-integer-to-rational x) (apply (table-get 'make-rat '(rational)) (list (cdr x) 1)))
+(define (raise-rational-to-real x) ((table-get 'make-real-num '(real-num)) (/ (cadr x) (cddr x))))
+(define (raise-real-to-complex x) (apply (table-get 'make-complex-from-real-imag '(complex)) (list (cdr x) 0)))
+;; registering functions under 'raise
+(table-set 'raise '(integer) (lambda (x) (raise-integer-to-rational x)))
+(table-set 'raise '(rational) (lambda (x) (raise-rational-to-real x)))
+(table-set 'raise '(real-num) (lambda (x) (raise-real-to-complex x)))
 
-;; Setting tolerance to 0.00001
-(define tolerance 0.00001)
+;;; APPLY GENERIC 
+(define (apply-generic op . args)
+    (apply
+      (table-get op (map get-tag args))
+      (map get-contents args)))
 
 ;; level 2 fucntions with apply-generic
 (define (add n m) (apply-generic 'add n m))
 (define (subtract n m) (apply-generic 'sub n m))
 (define (multiply n m) (apply-generic 'mul n m))
 (define (divide n m) (apply-generic 'div n m))
+(define (eq-num? n m) (apply-generic 'eq-num? n m))
 
-;;; TEST CODE (with all types of numbers)
-;(define test-lisp-num (make-lisp-num 2))
-;(apply-generic 'add test-lisp-num test-lisp-num)
-;(apply-generic 'sub test-lisp-num test-lisp-num)
-;(apply-generic 'mul test-lisp-num test-lisp-num)
-;(apply-generic 'div test-lisp-num test-lisp-num)
+(define a (make-integer 6))
+(define b ((table-get 'raise '(integer)) a))
+(define c ((table-get 'raise '(rational)) b))
+(define d ((table-get 'raise '(real-num)) c))
+(eq-num? d d)
+a
+b
+c
+d
 
-;(define test-rat (make-rat 1 3))
-;(apply-generic 'add test-rat test-rat)
-;(apply-generic 'sub test-rat test-rat)
-;(apply-generic 'mul test-rat test-rat)
-;(apply-generic 'div test-rat test-rat)
-
-;(define test-complex-real-imag (make-complex-from-real-imag 1 0))
-;(apply-generic 'add test-complex-real-imag test-complex-real-imag) 
-;(apply-generic 'sub test-complex-real-imag test-complex-real-imag) 
-;(apply-generic 'mul test-complex-real-imag test-complex-real-imag) 
-;(apply-generic 'div test-complex-real-imag test-complex-real-imag) 
-
-;(define test-complex-mag-ang (make-complex-from-mag-ang 1 (/ 3.1415296 4)))
-;(apply-generic 'add test-complex-mag-ang test-complex-mag-ang)
-;(apply-generic 'sub test-complex-mag-ang test-complex-mag-ang)
-;(apply-generic 'mul test-complex-mag-ang test-complex-mag-ang)
-;(apply-generic 'div test-complex-mag-ang test-complex-mag-ang)
-
-
-;;; test code
-(define a (make-lisp-num 14))
-(multiply a a) ;returns '(lisp-number 196)
-(define z (make-complex-from-real-imag 0.707 0.707)) ; 0.707 = 1/sqrt{2}
-
-(multiply z z) ;returns approx '(complex polar 1 . 1.57)

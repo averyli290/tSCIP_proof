@@ -31,11 +31,11 @@
     (define (eq-num? a b) (< (- a b) tolerance))
     
     ;; registration code
-    (table-set 'make-lisp-num '(lisp-number) (lambda (n) (set-tag '(lisp-number) (make-lisp-num n))))
-    (table-set 'add '(lisp-number lisp-number) (lambda (a b) (set-tag '(lisp-number) (add a b))))
-    (table-set 'sub '(lisp-number lisp-number) (lambda (a b) (set-tag '(lisp-number) (sub a b))))
-    (table-set 'mul '(lisp-number lisp-number) (lambda (a b) (set-tag '(lisp-number) (mul a b))))
-    (table-set 'div '(lisp-number lisp-number) (lambda (a b) (set-tag '(lisp-number) (div a b))))
+    (table-set 'make-lisp-num '(lisp-number) (lambda (n) (set-tag 'lisp-number (make-lisp-num n))))
+    (table-set 'add '(lisp-number lisp-number) (lambda (a b) (set-tag 'lisp-number (add a b))))
+    (table-set 'sub '(lisp-number lisp-number) (lambda (a b) (set-tag 'lisp-number (sub a b))))
+    (table-set 'mul '(lisp-number lisp-number) (lambda (a b) (set-tag 'lisp-number (mul a b))))
+    (table-set 'div '(lisp-number lisp-number) (lambda (a b) (set-tag 'lisp-number (div a b))))
     (table-set 'eq-num? '(lisp-number lisp-number) (lambda (a b) (eq-num? a b)))
     
         'done)
@@ -61,11 +61,11 @@
     (define (eq-num? rat1 rat2) (< (- (/ (numer rat1) (denom rat1)) (/ (numer rat2) (denom rat2))) tolerance))
 
     ;; registration code 
-    (table-set 'make-rat '(rational) (lambda (a b) (set-tag '(rational) (make-rat a b))))
-    (table-set 'add '(rational rational) (lambda (rat1 rat2) (set-tag '(rational) (add-rat rat1 rat2))))
-    (table-set 'sub '(rational rational) (lambda (rat1 rat2) (set-tag '(rational) (sub-rat rat1 rat2))))
-    (table-set 'mul '(rational rational) (lambda (rat1 rat2) (set-tag '(rational) (mul-rat rat1 rat2))))
-    (table-set 'div '(rational rational) (lambda (rat1 rat2) (set-tag '(rational) (div-rat rat1 rat2))))
+    (table-set 'make-rat '(rational) (lambda (a b) (set-tag 'rational (make-rat a b))))
+    (table-set 'add '(rational rational) (lambda (rat1 rat2) (set-tag 'rational (add-rat rat1 rat2))))
+    (table-set 'sub '(rational rational) (lambda (rat1 rat2) (set-tag 'rational (sub-rat rat1 rat2))))
+    (table-set 'mul '(rational rational) (lambda (rat1 rat2) (set-tag 'rational (mul-rat rat1 rat2))))
+    (table-set 'div '(rational rational) (lambda (rat1 rat2) (set-tag 'rational (div-rat rat1 rat2))))
     (table-set 'eq-num? '(rational rational) (lambda (rat1 rat2) (eq-num? rat1 rat2)))
 
         'done)
@@ -85,7 +85,7 @@
         (define (angle z) (atan (real-part z) (imag-part z)))
 
           ;; registration code
-        (table-set 'make-from-real-imag '(rect) (lambda (a b) (set-tag '(rect) (make-from-real-imag a b))))
+        (table-set 'make-from-real-imag '(rect) (lambda (a b) (set-tag 'rect (make-from-real-imag a b))))
         (table-set 'real-part '(rect) real-part)
         (table-set 'imag-part '(rect) imag-part)
         (table-set 'magnitude '(rect) magnitude)
@@ -103,7 +103,7 @@
         (define (imag-part z) (* (magnitude z) (sin (angle z))))
 
            ;; registration code 
-        (table-set 'make-from-mag-ang '(polar) (lambda (a b) (set-tag '(polar) (make-from-mag-ang a b))))
+        (table-set 'make-from-mag-ang '(polar) (lambda (a b) (set-tag 'polar (make-from-mag-ang a b))))
         (table-set 'real-part '(polar) real-part)
         (table-set 'imag-part '(polar) imag-part)
         (table-set 'magnitude '(polar) magnitude)
@@ -120,7 +120,7 @@
     (define (make-complex-from-mag-ang r theta) (apply (table-get 'make-from-mag-ang '(polar)) (list r theta)))
     
     ;; defining for use in the level two procedures (only for complex here)
-    (define (apply-generic op . args) (apply (table-get op (get-tag (car args))) (map get-contents args)))
+    (define (apply-generic op . args) (apply (table-get op (list (get-tag (car args)))) (map get-contents args)))
     (define (real-part z) (apply-generic 'real-part z))
     (define (imag-part z) (apply-generic 'imag-part z))
     (define (magnitude z) (apply-generic 'magnitude z))
@@ -134,12 +134,12 @@
     (define (eq-num? z1 z2) (and (< (- (real-part z1) (real-part z2)) tolerance) (< (- (real-part z1) (real-part z2)) tolerance)))
 
     ;; registration code 
-    (table-set 'make-complex-from-real-imag '(complex) (lambda (a b) (set-tag '(complex) (make-complex-from-real-imag a b))))
-    (table-set 'make-complex-from-mag-ang '(complex) (lambda (r theta) (set-tag '(complex) (make-complex-from-mag-ang r theta))))
-    (table-set 'add '(complex complex) (lambda (z1 z2) (set-tag '(complex) (add z1 z2))))
-    (table-set 'sub '(complex complex) (lambda (z1 z2) (set-tag '(complex) (sub z1 z2))))
-    (table-set 'mul '(complex complex) (lambda (z1 z2) (set-tag '(complex) (mul z1 z2))))
-    (table-set 'div '(complex complex) (lambda (z1 z2) (set-tag '(complex) (div z1 z2))))
+    (table-set 'make-complex-from-real-imag '(complex) (lambda (a b) (set-tag 'complex (make-complex-from-real-imag a b))))
+    (table-set 'make-complex-from-mag-ang '(complex) (lambda (r theta) (set-tag 'complex (make-complex-from-mag-ang r theta))))
+    (table-set 'add '(complex complex) (lambda (z1 z2) (set-tag 'complex (add z1 z2))))
+    (table-set 'sub '(complex complex) (lambda (z1 z2) (set-tag 'complex (sub z1 z2))))
+    (table-set 'mul '(complex complex) (lambda (z1 z2) (set-tag 'complex (mul z1 z2))))
+    (table-set 'div '(complex complex) (lambda (z1 z2) (set-tag 'complex (div z1 z2))))
     (table-set 'eq-num? '(complex complex) (lambda (z1 z2) (eq-num? z1 z2)))
 
 
@@ -154,7 +154,7 @@
 
 ;;; APPLY GENERIC 
 (define (apply-generic op . args)
-    (apply (table-get op (map (lambda (arg) (car (get-tag arg))) args)) (map get-contents args)))
+    (apply (table-get op (map get-tag args)) (map get-contents args)))
 
 ;;; OUTSIDE CONSTRUCTERS (FOR lisp-number, rational, complex rect and complex polar)
 (define (make-lisp-num a) ((table-get 'make-lisp-num '(lisp-number)) a))
