@@ -1,3 +1,5 @@
+; The error means that we have not registered magnitude and angle functions for the '(complex tag), only for '(rect) and '(polar)
+
 ;;; set-up: table
 (define table '())
 (define (table-set name tag proc)
@@ -15,6 +17,9 @@
 (define (get-tag tagged-object) (car tagged-object))
 (define (get-contents tagged-object) (cdr tagged-object))
 
+;;; DEFINING TOLERANCE as 0.00001
+(define tolerance 0.00001)
+
 
 ;;; LISP NUMBER PACKAGE
 
@@ -25,7 +30,7 @@
     (define (sub a b) (- a b))
     (define (mul a b) (* a b))
     (define (div a b) (/ a b))
-    (define (eq? a b) (= a b))
+    (define (eq-num? a b) (< (- a b) tolerance))
     
     ;; registration code
     (table-set 'make-lisp-num '(lisp-number) (lambda (n) (set-tag 'lisp-number (make-lisp-num n))))
@@ -33,6 +38,7 @@
     (table-set 'sub '(lisp-number lisp-number) (lambda (a b) (set-tag 'lisp-number (sub a b))))
     (table-set 'mul '(lisp-number lisp-number) (lambda (a b) (set-tag 'lisp-number (mul a b))))
     (table-set 'div '(lisp-number lisp-number) (lambda (a b) (set-tag 'lisp-number (div a b))))
+    (table-set 'eq-num? '(lisp-number lisp-number) (lambda (a b) (eq-num? a b)))
     
         'done)
 
@@ -54,6 +60,7 @@
     (define (sub-rat rat1 rat2) (make-rat (- (* (numer rat1) (denom rat2)) (* (numer rat2) (denom rat1))) (* (denom rat1) (denom rat2))))
     (define (mul-rat rat1 rat2) (make-rat (* (numer rat1) (numer rat2)) (* (denom rat1) (denom rat2))))
     (define (div-rat rat1 rat2) (make-rat (* (numer rat1) (denom rat2)) (* (denom rat1) (numer rat2))))
+    (define (eq-num? rat1 rat2) (< (- (/ (numer rat1) (denom rat1)) (/ (numer rat2) (denom rat2))) tolerance))
 
     ;; registration code 
     (table-set 'make-rat '(rational) (lambda (a b) (set-tag 'rational (make-rat a b))))
@@ -61,6 +68,7 @@
     (table-set 'sub '(rational rational) (lambda (rat1 rat2) (set-tag 'rational (sub-rat rat1 rat2))))
     (table-set 'mul '(rational rational) (lambda (rat1 rat2) (set-tag 'rational (mul-rat rat1 rat2))))
     (table-set 'div '(rational rational) (lambda (rat1 rat2) (set-tag 'rational (div-rat rat1 rat2))))
+    (table-set 'eq-num? '(rational rational) (lambda (rat1 rat2) (eq-num? rat1 rat2)))
 
         'done)
 
@@ -113,7 +121,7 @@
     (define (make-complex-from-real-imag a b) (apply (table-get 'make-from-real-imag '(rect)) (list a b)))
     (define (make-complex-from-mag-ang r theta) (apply (table-get 'make-from-mag-ang '(polar)) (list r theta)))
     
-    ;; defining for use in the level two procedures (only for complex here) (has to look up '(rect) and '(polar) so finding tag and putting it in a list for lookup)
+    ;; defining for use in the level two procedures (only for complex here)
     (define (apply-generic op . args) (apply (table-get op (list (get-tag (car args)))) (map get-contents args)))
     (define (real-part z) (apply-generic 'real-part z))
     (define (imag-part z) (apply-generic 'imag-part z))
@@ -125,14 +133,18 @@
     (define (sub z1 z2) (make-complex-from-real-imag (- (real-part z1) (real-part z2)) (- (imag-part z1) (imag-part z2))))
     (define (mul z1 z2) (make-complex-from-mag-ang (* (magnitude z1) (magnitude z2)) (+ (angle z1) (angle z2))))
     (define (div z1 z2) (make-complex-from-mag-ang (/ (magnitude z1) (magnitude z2)) (- (angle z1) (angle z2))))
+    (define (eq-num? z1 z2) (and (< (- (real-part z1) (real-part z2)) tolerance) (< (- (real-part z1) (real-part z2)) tolerance)))
 
     ;; registration code 
     (table-set 'make-complex-from-real-imag '(complex) (lambda (a b) (set-tag 'complex (make-complex-from-real-imag a b))))
     (table-set 'make-complex-from-mag-ang '(complex) (lambda (r theta) (set-tag 'complex (make-complex-from-mag-ang r theta))))
+    (table-set 'magnitude '(complex) magnitude)
+    (table-set 'angle '(complex) angle)
     (table-set 'add '(complex complex) (lambda (z1 z2) (set-tag 'complex (add z1 z2))))
     (table-set 'sub '(complex complex) (lambda (z1 z2) (set-tag 'complex (sub z1 z2))))
     (table-set 'mul '(complex complex) (lambda (z1 z2) (set-tag 'complex (mul z1 z2))))
     (table-set 'div '(complex complex) (lambda (z1 z2) (set-tag 'complex (div z1 z2))))
+    (table-set 'eq-num? '(complex complex) (lambda (z1 z2) (eq-num? z1 z2)))
 
 
         'done)
@@ -154,43 +166,16 @@
 (define (make-complex-from-real-imag a b) (apply (table-get 'make-complex-from-real-imag '(complex)) (list a b)))
 (define (make-complex-from-mag-ang r theta) (apply (table-get 'make-complex-from-mag-ang '(complex)) (list r theta)))
 
+
 ;;; displaying table (for debugging purposes)
 (display table)
-
-;; Setting tolerance to 0.00001
-(define tolerance 0.00001)
 
 ;; level 2 fucntions with apply-generic
 (define (add n m) (apply-generic 'add n m))
 (define (subtract n m) (apply-generic 'sub n m))
 (define (multiply n m) (apply-generic 'mul n m))
 (define (divide n m) (apply-generic 'div n m))
-
-;;; TEST CODE (with all types of numbers)
-;(define test-lisp-num (make-lisp-num 2))
-;(apply-generic 'add test-lisp-num test-lisp-num)
-;(apply-generic 'sub test-lisp-num test-lisp-num)
-;(apply-generic 'mul test-lisp-num test-lisp-num)
-;(apply-generic 'div test-lisp-num test-lisp-num)
-
-;(define test-rat (make-rat 1 3))
-;(apply-generic 'add test-rat test-rat)
-;(apply-generic 'sub test-rat test-rat)
-;(apply-generic 'mul test-rat test-rat)
-;(apply-generic 'div test-rat test-rat)
-
-;(define test-complex-real-imag (make-complex-from-real-imag 1 0))
-;(apply-generic 'add test-complex-real-imag test-complex-real-imag) 
-;(apply-generic 'sub test-complex-real-imag test-complex-real-imag) 
-;(apply-generic 'mul test-complex-real-imag test-complex-real-imag) 
-;(apply-generic 'div test-complex-real-imag test-complex-real-imag) 
-
-;(define test-complex-mag-ang (make-complex-from-mag-ang 1 (/ 3.1415296 4)))
-;(apply-generic 'add test-complex-mag-ang test-complex-mag-ang)
-;(apply-generic 'sub test-complex-mag-ang test-complex-mag-ang)
-;(apply-generic 'mul test-complex-mag-ang test-complex-mag-ang)
-;(apply-generic 'div test-complex-mag-ang test-complex-mag-ang)
-
+(define (eq-num? n m) (apply-generic 'eq-num? n m))
 
 ;;; test code
 (define a (make-lisp-num 14))
@@ -198,3 +183,4 @@
 (define z (make-complex-from-real-imag 0.707 0.707)) ; 0.707 = 1/sqrt{2}
 
 (multiply z z) ;returns approx '(complex polar 1 . 1.57)
+(apply-generic 'magnitude z)

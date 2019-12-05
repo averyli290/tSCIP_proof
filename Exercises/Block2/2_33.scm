@@ -23,7 +23,7 @@
     (define (real-part z) (car z))
     (define (imag-part z) (cdr z))
     (define (magnitude z) (sqrt (+ (* (real-part z) (real-part z)) (* (imag-part z) (imag-part z)))))
-    (define (angle z) (atan (real-part z) (imag-part z)))
+    (define (angle z) (atan (imag-part z) (real-part z)))
 
       ;; registration code
     (table-set 'make-from-real-imag 'rect (lambda (a b) (cons 'rect (make-from-real-imag a b))))

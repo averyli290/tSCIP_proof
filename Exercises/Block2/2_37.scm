@@ -1,15 +1,19 @@
-(define num-tower (list 'integer 'rational 'real 'complex))
+(define type-tower (list 'integer 'rational 'real 'complex))
 
 ;;; set-up: table
 (define table '())
 (define (table-set name tag proc)
       (set! table (cons (list name tag proc) table)))
 (define (table-get name tag)
+      ; returns 'none if function isn't in table
       (define (inner my-table)
-                (if (and (equal? name (caar my-table))
-                                          (equal? tag (cadar my-table)))
-                              (caddar my-table)
-                                          (inner (cdr my-table))))
+                (if (null? my-table)
+                    'none
+                    (if (and (equal? name (caar my-table))
+                                              (equal? tag (cadar my-table)))
+                                  (caddar my-table)
+                                              (inner (cdr my-table))))
+                )
           (inner table))
  
 ;;; set-up: tag helper functions go here
@@ -77,7 +81,7 @@
         (define (real-part z) (car z))
         (define (imag-part z) (cdr z)) 
         (define (magnitude z) (sqrt (+ (* (real-part z) (real-part z)) (* (imag-part z) (imag-part z)))))
-        (define (angle z) (atan (real-part z) (imag-part z)))
+        (define (angle z) (atan (imag-part z) (real-part z)))
 
           ;; registration code
         (table-set 'make-from-real-imag '(rect) (lambda (a b) (set-tag 'rect (make-from-real-imag a b))))
@@ -131,6 +135,8 @@
     ;; registration code 
     (table-set 'make-complex-from-real-imag '(complex) (lambda (a b) (set-tag 'complex (make-complex-from-real-imag a b))))
     (table-set 'make-complex-from-mag-ang '(complex) (lambda (r theta) (set-tag 'complex (make-complex-from-mag-ang r theta))))
+    (table-set 'magnitude '(complex) magnitude)
+    (table-set 'angle '(complex) angle)
     (table-set 'add '(complex complex) (lambda (z1 z2) (set-tag 'complex (add z1 z2))))
     (table-set 'sub '(complex complex) (lambda (z1 z2) (set-tag 'complex (sub z1 z2))))
     (table-set 'mul '(complex complex) (lambda (z1 z2) (set-tag 'complex (mul z1 z2))))
@@ -164,10 +170,28 @@
 (table-set 'raise '(real-num) (lambda (x) (raise-real-to-complex x)))
 
 ;;; APPLY GENERIC 
+
 (define (apply-generic op . args)
-    (apply
-      (table-get op (map get-tag args))
-      (map get-contents args)))
+    ; for telling which arg to raise
+    (define (get-tower-tier num-obj)
+        ; raises level until it gets to complex (tier 4 is integer, tier 3 is rational, tier 2 is real, tier 1 is complex)
+        (if (equal? (get-tag num-obj) 'complex)
+            1
+            (+ 1 (get-tower-tier ((table-get 'raise (list (get-tag num-obj))) num-obj))))) ; raises to next level
+
+    ; converts args to the same type and then applies the correct function from the table
+    (cond ((not (equal? 'none (table-get op (map get-tag args))))
+            (apply (table-get op (map get-tag args)) (map get-contents args)))
+          ((> (get-tower-tier (car args)) (get-tower-tier (cadr args))) (apply-generic op ((table-get 'raise (list (get-tag (car args)))) (car args)) (cadr args)))
+          ((< (get-tower-tier (car args)) (get-tower-tier (cadr args))) (apply-generic op (car args) ((table-get 'raise (list (get-tag (cadr args)))) (cadr args))))
+          ((= (get-tower-tier (car args)) (get-tower-tier (cadr args))) (if (and (equal? (get-tag (car args)) 'complex) (equal? (get-tag (car args)) 'complex))
+                                                                          (error "apply-generic does not work with current inputs")
+                                                                          (apply-generic op ((table-get 'raise (list (get-tag (car args)))) (car args)) (cadr args))))
+          (else (error "apply-generic does not work with current inputs")))
+    )
+
+
+
 
 ;; level 2 fucntions with apply-generic
 (define (add n m) (apply-generic 'add n m))
@@ -176,13 +200,12 @@
 (define (divide n m) (apply-generic 'div n m))
 (define (eq-num? n m) (apply-generic 'eq-num? n m))
 
+;test code
 (define a (make-integer 6))
 (define b ((table-get 'raise '(integer)) a))
 (define c ((table-get 'raise '(rational)) b))
 (define d ((table-get 'raise '(real-num)) c))
-(eq-num? d d)
-a
-b
-c
-d
+
+
+
 
