@@ -185,12 +185,12 @@
 
 ;;; LOWER FUNCTION
 (define (lower num-obj)
-    ;; checks if safe to lower number type, if so, lowers it; safe if (raise (project num)) = num
+    ;; checks if safe to lower number type, if so, lowers it, otherwise, returns number; safe if (raise (project num)) = num
     (if (equal? (car type-tower) (get-tag num-obj))
         num-obj
         (if (equal? ((table-get 'raise (list (get-tag ((table-get 'project (list (get-tag num-obj))) num-obj)))) ((table-get 'project (list (get-tag num-obj))) num-obj)) num-obj)
-            (lower ((table-get 'project (list (get-tag num-obj))) num-obj)))))
-
+            (lower ((table-get 'project (list (get-tag num-obj))) num-obj))
+            num-obj)))
 
 
 ;;; APPLY GENERIC 
@@ -227,9 +227,16 @@
 (define (eq-num? n m) (apply-generic 'eq-num? n m))
 
 ;test code
-(define a (make-integer 6))
-(define b ((table-get 'raise '(integer)) a))
-(define c ((table-get 'raise '(rational)) b))
-(define d ((table-get 'raise '(real-num)) c))
+;(define a (make-integer 6))
+;(define b ((table-get 'raise '(integer)) a))
+;(define c ((table-get 'raise '(rational)) b))
+;(define d ((table-get 'raise '(real-num)) c))
 
+
+;(define test1 (make-rat 1 5))
+;(define test2 (make-complex-from-mag-ang 1 1.57))
+;(add test1 test2)
+;(subtract test1 test2)
+;(multiply test1 test2)
+;(divide test1 test2)
 
