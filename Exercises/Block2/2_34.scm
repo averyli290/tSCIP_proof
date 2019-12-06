@@ -148,7 +148,7 @@
 (define (apply-generic op . args)
     (apply (table-get op (map get-tag args)) (map get-contents args)))
 
-;;; OUTSIDE CONSTRUCTERS (FOR lisp-number, rational, complex rect and complex polar)
+;;; OUTSIDE CONSTRUCTERS (for lisp-number, rational, complex rect and complex polar)
 (define (make-lisp-num a) ((table-get 'make-lisp-num '(lisp-number)) a))
 (define (make-rat numer denom) (apply (table-get 'make-rat '(rational)) (list numer denom)))
 (define (make-complex-from-real-imag a b) (apply (table-get 'make-complex-from-real-imag '(complex)) (list a b)))
