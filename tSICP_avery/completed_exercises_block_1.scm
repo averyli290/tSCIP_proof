@@ -1,11 +1,11 @@
-;;; BEGIN:: 1.0
+;;; BEGIN: 1.0
 
 (define (my-plus x y) (+ x y))
 
-;;; END:: 1.0
+;;; END: 1.0
 
 
-;;; BEGIN:: 1.1
+;;; BEGIN: 1.1
 
 10
 12
