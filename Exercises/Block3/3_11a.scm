@@ -4,17 +4,19 @@
 (define (frame-vars frame) (car frame))
 (define (frame-values frame) (cdr frame))
 
-(define (lookup-var-value var env)
-    (define (var-in-frame vars vals) ; Iterates through frame and checks if var is in there, if so, returns value, otherwise, returns 'none
+(define (helper-func var frame)
+    (define (var-in-frame vars vals accum) ; Iterates through frame and checks if var is in there, if so, returns list of values looked through with val of var at the top, otherwise, returns '()
         (if (null? vars)
-            'val-not-in-frame
+            '()
             (if (eq? var (car vars))
-                (car vals)
-                (var-in-frame (cdr vars) (cdr vals)))))
+                (append (list (car vals)) accum)
+                (var-in-frame (cdr vars) (cdr vals) (append (list (car vals)) accum)))))
+    (var-in-frame (frame-vars frame) (frame-values frame) '()))
+
+(define (lookup-var-value var env)
     (if (null? env) ; return 'error is env is empty, otherwise checks top frame for var
         (error "Variable does not have a value in environment")
-        (let ((val (var-in-frame (frame-vars (top-frame env)) (frame-values (top-frame env)))))
-            (if (eq? 'val-not-in-frame val)
+        (let ((temp-val (helper-func var (top-frame env))))
+            (if (eq? '() temp-val)
                 (lookup-var-value var (enclosing-env env))
-                val))))
-
+                (car temp-val)))))

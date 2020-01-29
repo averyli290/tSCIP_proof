@@ -13,6 +13,13 @@
                 (var-in-frame (cdr vars) (cdr vals) (append (list (car vals)) accum)))))
     (var-in-frame (frame-vars frame) (frame-values frame) '()))
 
+(define (reverse-list l)
+    (define (iter toreverse accum)
+        (if (null? toreverse)
+            accum
+            (iter (cdr toreverse) (cons (car toreverse) accum))))
+    (iter l '()))
+
 (define (replace-value-of-var var val frame) ; replaces value of var 
     (define f-vars (frame-vars frame))
     (define f-values (frame-values frame))
@@ -22,11 +29,12 @@
             (iter (cdr vars) (cdr vals) (append (list (car vals)) accum))))
     (iter f-vars f-values '()))
 
-(define (set-var-value! var value env)
-     (if (null? env) ; return 'error is env is empty, otherwise attempts to set var in top frame
-        (error "Variable does not have a value in environment")
-        (let ((temp-val (helper-func var (top-frame env))))
-            (if (null? temp-val)
-                (set-var-value! var value (enclosing-env env))
-                (begin (set-cdr! (top-frame env) (replace-value-of-var var value (top-frame env)))
-                       (car temp-val))))))
+(define (define-var! var value env)
+    (let ((temp-val (helper-func var (top-frame env))))
+        (if (null? temp-val)
+            (let ((f-vars (car (cons (frame-vars (top-frame env)) '())))
+                  (f-values (car (cons (frame-values (top-frame env)) '()))))
+                (set-car! (top-frame env) (cons var f-vars))
+                (set-cdr! (top-frame env) (cons value f-values)))
+            (set-cdr! (top-frame env) (replace-value-of-var var value (top-frame env)))))
+    var)

@@ -1,3 +1,7 @@
+;;; -----------------------
+;;; FRAMES AND ENVIRONMENTS 
+;;; -----------------------
+
 (define (make-environment) (list (cons '() '())))
 (define (top-frame env) (car env))
 (define (enclosing-env env) (cdr env))
@@ -61,11 +65,60 @@
     (cons (cons vars args) base-env))
 
 
+;;; ---------------
+;;; TAGS AND TABLES
+;;; ---------------
 
-(define G (make-empty-environment))
-(set! G (extend-environment '(a b c d) (list 1 2 3 4) G))
-(set-var-value! 'a 5 G)
-(define-var! 'e '() G)
-(lookup-var-value 'e G)
-G
+(define table '())
+(define (set-table tag proc)
+    (set! table (cons (cons tag proc) table))) ; Adds procedure to table
 
+;ADD FOLD SAVING IN VIM
+
+(define (set-tag tag contents)
+    (cons tag contents))
+
+(define (get-tag expr)
+    (car expr))
+
+(define (get-contents expr)
+    (cdr expr))
+
+
+(define (get-table tag)
+    (define (inner my-table)
+        (cond ((null? my-table) 'none)
+              ((eq? (get-tag (car my-table)) tag) (get-contents (car my-table)))
+              (else (inner (cdr my-table)))))
+    (inner table))
+
+
+(define (pre-eval expr)
+    (if (or (number? expr) (string? expr))
+        (list 'self-evaluating expr)
+        (if (symbol? expr)
+          (list 'variable expr)
+          expr)))
+
+(define (new-eval expr env)
+    (define to-be-applied (pre-eval expr))
+    (newline)
+    (display to-apply)
+    (newline)
+    (display (get-tag to-be-applied))
+    ((get-table (get-tag to-be-applied)) to-be-applied env))
+
+(define (install-eval-package)
+    (set-table 'self-evaluating (lambda (expr env) (car (get-contents expr))))
+    (set-table 'variable (lambda (expr env) (lookup-var-value (car (get-contents expr)) env)))
+    (set-table 'define (lambda (expr env) (define-var! (car (get-contents expr)) (new-eval (cadr (get-contents expr)) env) env)))
+    (set-table 'set! (lambda (expr env) (set-var-value! (car (get-contents expr)) (new-eval (cadr (get-contents expr)) env) env))))
+
+(install-eval-package)
+
+(define global (make-environment))
+(new-eval '(define a '()) global)
+;(new-eval '(define b a) global)
+;(new-eval 'b global) ;(should be 13)
+
+(symbol? '())
