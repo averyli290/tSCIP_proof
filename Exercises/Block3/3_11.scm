@@ -62,10 +62,10 @@
 
 
 
-(define G (make-empty-environment))
+(define G (make-environment))
 (set! G (extend-environment '(a b c d) (list 1 2 3 4) G))
 (set-var-value! 'a 5 G)
-(define-var! 'e '() G)
+(define-var! 'e '(4 20) G)
 (lookup-var-value 'e G)
 G
 

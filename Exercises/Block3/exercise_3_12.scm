@@ -37,7 +37,6 @@
     (if (null? env) ; return 'error is env is empty, otherwise checks top frame for var
         (error "Variable does not have a value in environment")
         (let ((temp-val (helper-func var (top-frame env))))
-            (display temp-val)
             (if (not (car temp-val))
                 (lookup-var-value var (enclosing-env env))
                 (cadr temp-val)))))
@@ -102,23 +101,24 @@
 
 (define (new-eval expr env)
     (define to-be-applied (pre-eval expr))
-    (newline)
-    (display to-apply)
-    (newline)
-    (display (get-tag to-be-applied))
     ((get-table (get-tag to-be-applied)) to-be-applied env))
 
 (define (install-eval-package)
+    (define (eval-begin expr env) ; Adding this func to table instead of just writing entire thing in lambda for "begin" function
+        (define (iter to-be-new-evalued) ; evaluates all of the items and returns the evaluation of the last item.
+            (if (null? (cdr to-be-new-evalued))
+                (new-eval (car to-be-new-evalued) env)
+                (begin (new-eval (car to-be-new-evalued) env) (iter (cdr to-be-new-evalued)))))
+        (if (null? (get-contents expr))
+            'unspecified-return-value ; throws error if just "(begin)" with no arguments
+            (iter (get-contents expr))))
+
+    ; setting all the tags that can be evaluated in the table
     (set-table 'self-evaluating (lambda (expr env) (car (get-contents expr))))
     (set-table 'variable (lambda (expr env) (lookup-var-value (car (get-contents expr)) env)))
     (set-table 'define (lambda (expr env) (define-var! (car (get-contents expr)) (new-eval (cadr (get-contents expr)) env) env)))
-    (set-table 'set! (lambda (expr env) (set-var-value! (car (get-contents expr)) (new-eval (cadr (get-contents expr)) env) env))))
+    (set-table 'set! (lambda (expr env) (set-var-value! (car (get-contents expr)) (new-eval (cadr (get-contents expr)) env) env)))
+    (set-table 'quote (lambda (expr env) (car (get-contents expr))))
+    (set-table 'begin (lambda (expr env) (eval-begin expr env))))
 
 (install-eval-package)
-
-(define global (make-environment))
-(new-eval '(define a '()) global)
-;(new-eval '(define b a) global)
-;(new-eval 'b global) ;(should be 13)
-
-(symbol? '())
