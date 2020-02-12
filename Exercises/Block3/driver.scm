@@ -1,4 +1,4 @@
-(load "exercise_3_14.scm")
+(load "metalisp.scm")
 
 (define (driver-loop)
     (prompt-for-input input-prompt)
@@ -22,13 +22,7 @@
 
 
 
-(define fib (lambda (x)
-    (if (= x 1)
-        1
-        (if (= x 0)
-            1
-            (+ (fib (- x 2)) (fib (- x 1)))))))
 
-(fib 10)
+
 
 

@@ -226,6 +226,8 @@
 
 (define (setup-global-environment)
   ; returns a premade environment with primitives set and also calls install-eval-package
+
+    ;; ADDING PRIMITIVES
     (define primitives '())
     (define (add-primitive name code) (set! primitives (cons (cons name (make-primitive-procedure code)) primitives)))
     (define (add-primitive-predicate name code) (set! primitives (cons (cons name (make-primitive-procedure (lambda (x y) (if (code x y) 'true-object 'false-object)))) primitives))) ; modifies code to return 'true-object and 'false-object for 2 object comparisons
@@ -237,13 +239,23 @@
     (add-primitive-predicate '= =)
     ; adding cons, car, cdr, and 'null-object to represent null
     (add-primitive 'make-null (lambda () '())) ; just returns empty list when evaluated
-    (add-unary-primitive-predicate 'null? null?)
-    (define (new-cons x y) (lambda (m) (m x y))) ; imitating cons pair
+    (add-unary-primitive-predicate 'null? (lambda (input) (or (null? input) (eq? (quote null-object) input))))
+        ; checks to see if null? in regular list sense '(), or also 'null-object interpreted in meta-lisp as (quote null-objct)
+        ;(eg. (new-eval '(null? null-object) global) returns 'false-object, but (new-eval '(null? 'null-object) global) returns 'true-object
+    (define (new-cons x y) (lambda (m) (m x y))) ; imitating cons pair with procedure objects 
     (define new-car (lambda (x y) x))
     (define new-cdr (lambda (x y) y))
     (add-primitive 'cons new-cons)
     (add-primitive 'car (lambda (new-cons-procedure-object) (new-cons-procedure-object new-car)))
     (add-primitive 'cdr (lambda (new-cons-procedure-object) (new-cons-procedure-object new-cdr)))
+
+    ;; Other primitives
+    (add-primitive-predicate 'or (lambda (x y) (or (eq? x 'true-object) (eq? y 'true-object))))
+    (add-primitive-predicate 'and (lambda (x y) (and (eq? x 'true-object) (eq? y 'true-object))))
+    (add-primitive-predicate '< <)
+    (add-primitive-predicate '> >)
+
+    ;; ADDING PRIMITIVES TO LIST DONE
 
     (define global (make-environment))
 
@@ -255,7 +267,7 @@
                 (bind-primitives env (cdr primitives-list)))))
 
     (bind-primitives global primitives) ; binding primitives
-    (install-eval-package) ; adding non-primitive functions
+    (install-eval-package) ; adding non-primitive procedures 
 
     global)
 
@@ -264,4 +276,6 @@
 ;;; TESTING
 ;;; -------
 
+(define global (setup-global-environment))
+(print-environment global)
 
