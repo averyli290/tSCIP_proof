@@ -1,0 +1,11 @@
+(assign (reg a) (const 0))
+(assign (reg b) (op read))
+loop-label
+    (assign (reg a-squared) (op *) (reg a) (reg a))
+    (test (op >) (reg a-squared) (reg b))
+    (branch (label done-label))
+    (assign (reg temp) (op +) (reg a) (const 1))
+    (assign (reg a) (reg temp))
+    (goto (label loop-label))
+done-label
+    (perform (op write) (reg a-squared))

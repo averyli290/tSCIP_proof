@@ -1,0 +1,13 @@
+(assign (reg counter) (const 1))
+(assign (reg n) (op read))
+(assign (reg product) (const 1))
+loop-label
+    (test (op >) (reg counter) (reg n))
+    (branch (label done-label))
+    (assign (reg temp1) (op *) (reg counter) (reg product))
+    (assign (reg product) (reg temp))
+    (assign (reg temp2) (op +) (reg counter) (const 1))
+    (assign (reg counter) (reg temp2))
+    (goto (label loop-label))
+done-label
+    (perform (op write) (reg product))

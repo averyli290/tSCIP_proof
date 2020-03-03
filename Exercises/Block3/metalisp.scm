@@ -1,6 +1,8 @@
 ;;; implemented standard notation for defining procedures.
 ;;; Implemented cond
 ;;; implemented cons, car, and cdr
+;;; implemented <, >, and list
+;;; implemented display using old display
 
 
 ;;; -----------------------
@@ -40,7 +42,8 @@
 
 (define (lookup-var-value var env)
     (if (null? env) ; return 'error is env is empty, otherwise checks top frame for var
-        (error "Variable does not have a value in environment")
+        (begin (newline) (display var) (newline) (error "Variable does not have a value in environment"))
+        ;(error "Variable does not have a value in environment")
         (let ((temp-val (helper-func var (top-frame env))))
             (if (not (car temp-val))
                 (lookup-var-value var (enclosing-env env))
@@ -48,7 +51,8 @@
 
 (define (set-var-value! var value env)
      (if (null? env) ; return 'error is env is empty, otherwise attempts to set var in top frame
-        (error "Variable does not have a value in environment")
+        (begin (display var) (newline) (error "Variable does not have a value in environment"))
+        ;(error "Variable does not have a value in environment")
         (let ((temp-val (helper-func var (top-frame env))))
             (if (not (car temp-val))
                 (set-var-value! var value (enclosing-env env))
@@ -120,25 +124,42 @@
           expr)))
 
 (define (new-eval expr env)
+    (newline)
+    (display "expr HERE -----> ")
+    (display expr)
     (define to-be-applied (pre-eval expr))
     (if (eq? 'none (get-table (get-tag to-be-applied)))
         (new-eval (cons 'application expr) env)
         ((get-table (get-tag to-be-applied)) to-be-applied env)))
 
 (define (eval-sequence exprs env)
+    (begin (newline) (display "123123213 ") (display "contents of exprs:") (display exprs) 'unspecified-return-value) ; throws error if just "(begin)" with no arguments
     (define (iter to-be-new-evalued) ; evaluates all of the items and returns the evaluation of the last item.
         (if (null? (cdr to-be-new-evalued))
             (new-eval (car to-be-new-evalued) env)
-            (begin (new-eval (car to-be-new-evalued) env) (iter (cdr to-be-new-evalued)))))
+            (begin (newline) (display "CAR IS HERE: ") (display (car to-be-new-evalued)) (new-eval (car to-be-new-evalued) env) (iter (cdr to-be-new-evalued)))))
     (if (null? (get-contents exprs))
-        'unspecified-return-value ; throws error if just "(begin)" with no arguments
+    ;;;;;;;;;;;;; 
+
+
+    ;'unspecified-return-value is being returned. this is because (null? (get-contents exprs)) returns true, what should (get-contents exprs) be?
+    ; (get-contents exprs) = (cdr exprs), but exprs is ((+ n 1)) (displayed below)
+
+    ;;;;;;;;
+        (begin (newline) (display "contents of exprs:") (display exprs) 'unspecified-return-value) ; throws error if just "(begin)" with no arguments
         (iter (get-contents exprs))))
 
 ; should be part of PROCEDURE OBJECTS AND APPLY, but requires eval-sequence
 (define (new-apply proc vals) ; Evaluates proc in a new frame with variables bound, checks if procedure is primitive
+    (newline)
+    (display "PROCEDURE-BODY")
     (if (primitive? proc)
         (apply (primitive-procedure-code proc) vals)
-        (eval-sequence (procedure-body proc) (extend-environment (procedure-vars proc) vals (procedure-env proc)))))
+        (begin 
+          (let ((temp-env (extend-environment (procedure-vars proc) vals (procedure-env proc))))
+            (eval-sequence (set-tag 'begin (procedure-body proc)) temp-env)
+            ))))
+        ;(eval-sequence (procedure-body proc) (extend-environment (procedure-vars proc) vals (procedure-env proc)))))
 
 (define (install-eval-package)
     (define (eval-begin expr env) ; Adding this func to table instead of just writing entire thing in lambda for "begin" function
@@ -161,7 +182,7 @@
 
     ; setting all the tags that can be evaluated in the table
     (set-table 'self-evaluating (lambda (expr env) (car (get-contents expr))))
-    (set-table 'variable (lambda (expr env) (lookup-var-value (car (get-contents expr)) env)))
+    (set-table 'variable (lambda (expr env) (begin (display "VAR HERE") (display expr) (lookup-var-value (car (get-contents expr)) env))))
     (set-table 'define (lambda (expr env) (eval-define expr env)))
     (set-table 'set! (lambda (expr env) (set-var-value! (car (get-contents expr)) (new-eval (cadr (get-contents expr)) env) env)))
     (set-table 'quote (lambda (expr env) (car (get-contents expr))))
@@ -171,8 +192,9 @@
     (set-table 'cond (lambda (expr env) (eval-cond expr env)))
 
     (define (lambda-vars expr) (cadr expr)) ;lambda helper functions
-    (define (lambda-body expr) (cdr expr))
-    (set-table 'lambda (lambda (expr env) (make-procedure (lambda-vars expr) (lambda-body expr) env))) ;means eval-lambda
+    (define (lambda-body expr) (cddr expr))
+    (set-table 'lambda (lambda (expr env) (begin (newline) (lambda-vars expr) (newline) (display (lambda-body expr)) 
+                         (make-procedure (lambda-vars expr) (lambda-body expr) env)))) ;means eval-lambda
     (define (application-proc expr) (car (get-contents expr))) ;application helper functions
     (define (application-args expr) (cdr (get-contents expr)))
     (define (eval-application expr env) ; passes the application-procedure and the evaluated arguments into the new-apply function to apply the function to the evaluated values
@@ -238,7 +260,7 @@
     (add-primitive '/ /)
     (add-primitive-predicate '= =)
     ; adding cons, car, cdr, and 'null-object to represent null
-    (add-primitive 'make-null (lambda () '())) ; just returns empty list when evaluated
+    (add-primitive 'make-null (quote null-object)) ; just returns empty list when evaluated
     (add-unary-primitive-predicate 'null? (lambda (input) (or (null? input) (eq? (quote null-object) input))))
         ; checks to see if null? in regular list sense '(), or also 'null-object interpreted in meta-lisp as (quote null-objct)
         ;(eg. (new-eval '(null? null-object) global) returns 'false-object, but (new-eval '(null? 'null-object) global) returns 'true-object
@@ -254,6 +276,12 @@
     (add-primitive-predicate 'and (lambda (x y) (and (eq? x 'true-object) (eq? y 'true-object))))
     (add-primitive-predicate '< <)
     (add-primitive-predicate '> >)
+    (define (iter-create-list args) ; have to create a different structure for list because cons is different (using procedure objects)
+        (if (null? args)
+            (quote null-object)
+            (new-cons (car args) (iter-create-list (cdr args)))))
+    (add-primitive 'list (lambda args (iter-create-list args)))
+    (add-primitive 'display display)
 
     ;; ADDING PRIMITIVES TO LIST DONE
 
@@ -277,5 +305,16 @@
 ;;; -------
 
 (define global (setup-global-environment))
+
+;;; test map
+
+;(new-eval '(define a (list 1 2 3 4)) global)
+;(new-eval '(car (cdr a)) global)
+(new-eval '(define test (lambda (n) (+ n 1))) global)
+(new-eval '(test 1) global)
+(new-eval '(begin (+ 1 1) (+ 1 2)) global)
+
 (print-environment global)
+
+
 

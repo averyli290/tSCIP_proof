@@ -1,0 +1,10 @@
+(assign (reg x) (op read))
+(assign (reg guess) (const 1.0))
+loop-label
+(test (op good-enough?) (reg guess))
+(branch (label done-label))
+(assign (reg temp) (op improve) (reg guess))
+(assign (reg guess) (reg temp))
+(goto (label done-label))
+done-label
+(perform (op write) (reg guess))
