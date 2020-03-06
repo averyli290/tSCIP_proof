@@ -1,0 +1,7 @@
+For factorial
+- the input is contained within (reg n) at the beginning
+- the place to go to next is contained within (reg continue) at the beginning
+- the output is contained within (reg ans) at end
+
+Should add
+- the stack is not different when it leaves and comes back 
