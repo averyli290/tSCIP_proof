@@ -1,8 +1,30 @@
-;;; implemented standard notation for defining procedures.
 ;;; Implemented cond
 ;;; implemented cons, car, and cdr
 ;;; implemented <, >, and list
 ;;; implemented display using old display
+
+;;; --------
+;;; PRINTING
+;;; --------
+
+(define (sanitize-output exp)
+    (if (and (pair? exp) (eq? 'procedure (get-tag exp)))
+        (list 'procedure (procedure-vars exp) (procedure-body exp) 'enclosing-env)
+        exp))
+
+(define (print-environment env)
+    (define (print-frame vars values)
+        (if (null? vars)
+            (begin (newline) (display "--------"))
+            (begin (newline) (display (car vars)) (display ": ") (display (sanitize-output (car values)))
+                (print-frame (cdr vars) (cdr values)))))
+    (if (null? env)
+        'done
+        (begin (newline) (display "Next frame:") (newline)
+            (print-frame (car (top-frame env)) (cdr (top-frame env)))
+            (print-environment (enclosing-env env)))))
+
+
 
 
 ;;; -----------------------
@@ -42,8 +64,8 @@
 
 (define (lookup-var-value var env)
     (if (null? env) ; return 'error is env is empty, otherwise checks top frame for var
-        (error "Variable does not have a value in environment")
         ;(error "Variable does not have a value in environment")
+        (begin (newline) (display var) (display " (lookup-var-value): ") (error "Variable does not have a value in environment"))
         (let ((temp-val (helper-func var (top-frame env))))
             (if (not (car temp-val))
                 (lookup-var-value var (enclosing-env env))
@@ -51,8 +73,8 @@
 
 (define (set-var-value! var value env)
      (if (null? env) ; return 'error is env is empty, otherwise attempts to set var in top frame
-        (error "Variable does not have a value in environment")
         ;(error "Variable does not have a value in environment")
+        (begin (newline) (display var) (display "(set-var-value): ") (error "Variable does not have a value in environment"))
         (let ((temp-val (helper-func var (top-frame env))))
             (if (not (car temp-val))
                 (set-var-value! var value (enclosing-env env))
@@ -125,6 +147,8 @@
 
 (define (new-eval expr env)
     (define to-be-applied (pre-eval expr))
+    (newline)
+    (display to-be-applied)
     (if (eq? 'none (get-table (get-tag to-be-applied)))
         (new-eval (cons 'application expr) env)
         ((get-table (get-tag to-be-applied)) to-be-applied env)))
@@ -144,6 +168,10 @@
         (apply (primitive-procedure-code proc) vals)
         (begin 
           (let ((temp-env (extend-environment (procedure-vars proc) vals (procedure-env proc))))
+            (newline)
+            (display "ENVIRONMENT HERE")
+            (begin (newline) (display "x: ") (display (lookup-var-value 'x temp-env)))
+            (print-environment temp-env)
             (eval-sequence (set-tag 'begin (procedure-body proc)) temp-env)
             ))))
         ;(eval-sequence (procedure-body proc) (extend-environment (procedure-vars proc) vals (procedure-env proc)))))
@@ -301,5 +329,13 @@
 ;(new-eval '(test 1) global)
 ;(new-eval '(define fact (lambda (n) (if (= n 1) 1 (* n (fact (- n 1)))))) global)
 ;(new-eval '(fact 6) global)
+
+(new-eval '(define g (lambda (x) (cond ((= x 0) 0) ((= x 1) 2 1) ((= x 10) 10) (else -1)))) global)
+(print-environment global)
+(new-eval '(g 0) global))
+;(assert (= 10 (new-eval '(g 10) global)))
+;(assert (= 1 (new-eval '(g 1) global)))
+;(assert (= -1 (new-eval '(g 2) global)))
+
 
 (print-environment global)
