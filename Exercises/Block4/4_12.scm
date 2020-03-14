@@ -52,24 +52,20 @@
     (define (iter f) ; assumes that the var is already in the frame, returns previous value set for var
         (if (eq? var (get-var (car f)))
             (set-car! f (cons var value))
-            (set-cdr! f (iter (cdr f)))))
+            (set! f (cons f (iter (cdr f))))))
     (if (not (var-in-frame? var))
-        (error "Variable does not have a value" )
+        (begin (display "set-var-value: ") (display var) (error "Variable does not have a value"))
+        ;(error "Variable does not have a value")
         (iter frame)))
 
 (define (get-var-value var)
     (define (iter f)
         (if (null? f)
-            (error "Variable does not have a value")
+            (begin (display var) (error "Variable does not have a value"))
             (if (eq? var (get-var (car f)))
                 (get-val (car f))
                 (iter (cdr f)))))
     (iter frame))
-
-(define-var 'test 1)
-(var-in-frame? 'test)
-(set-var-value! 'test 2)
-(get-var-value 'test)
 
 
 ;;; ---------------
@@ -91,7 +87,7 @@
 
 (define (get-table tag)
     (define (inner my-table)
-        (cond ((null? my-table) 'none)
+        (cond ((null? my-table) 'none) ; returns 'none if tag is not in table
               ((eq? (get-tag (car my-table)) tag) (get-contents (car my-table)))
               (else (inner (cdr my-table)))))
     (inner table))
@@ -103,60 +99,99 @@
 (define (op-name op) (car op))
 (define (op-func op) (cdr op))
 
+;;; -----
+;;; STACK
+;;; -----
+
+
+
 ;;; ----------
 ;;; EVALUATION
 ;;; ----------
 
 (define (pre-eval expr)
     (if (symbol? expr)
-        (set-tag 'label expr)
+        (set-tag 'label expr) ; if the expression is just a symbol, then it is a label
         expr))
 
 (define (rml-eval expr)
     (let ((to-be-evaled (pre-eval expr))) ; pre-evals the expr to see if label first, then looks up tag in table and applies corresponding function
-        ((get-table (get-tag to-be-evaled)) to-be-evaled)))
+        (let ((table-value (get-table (get-tag to-be-evaled))))
+            (newline)
+            (newline)
+            (display "to-be-evaled: ")
+            (display to-be-evaled) (newline) (display "table-value: ")
+            (display table-value)
+            ;(display (map (lambda (expr) (rml-eval expr)) (cdr to-be-evaled)))
+            (if (eq? table-value 'none)
+                (if (eq? (caar expr) 'op) ; if not in table, the expression is in the form of ((op operation) ...) or ((non-op expression)) which should be evaluated by evaluating the car of it (non-op expression)
+                    (apply (rml-eval (car expr)) (map (lambda (expr) (rml-eval expr)) (cdr to-be-evaled)))
+                    (rml-eval (car to-be-evaled)))
+                (table-value to-be-evaled))
+            )))
 
-(define (add-lisp-func-two-arg name function) ; adds a function that already exists in list that takes in two arguments
-    (set-table name (lambda (expr) (function (rml-eval (car (get-contents expr))) (rml-eval (cadr (get-contents expr)))))))
+(define (add-lisp-func name function) ; adds a function that already exists in list that takes in two arguments
+    (set-table name function))
 
 (define (install-rml-eval-package)
 
     (set-table 'const (lambda (expr) (car (get-contents expr))))
-    (add-lisp-func-two-arg '+ +)
-    (add-lisp-func-two-arg '- +)
+    (set-table 'reg (lambda (expr) (get-var-value (car (get-contents expr)))))
+    (set-table 'label (lambda (expr) (get-var-value (car (get-contents expr)))))
+    (set-table 'assign (lambda (expr) (set-var-value! (cadar (get-contents expr)) (rml-eval (cdr (get-contents expr))))))
+    (set-table 'op (lambda (expr) (get-table (car (get-contents expr)))))
+    (add-lisp-func '+ +)
+    (add-lisp-func '- +)
+    (add-lisp-func '* *)
+    (add-lisp-func '/ /)
     'done)
 
 (install-rml-eval-package)
 
 (define (make-machine reg-names op-list instructions)
-
+    ; returns setup function and instructions as a CONS PAIR at end
     (define (setup) ; adds all registers to the frame and operations to the table
+        ; returns a begin statement that runs the iter functions to set up the registers and operations
         (define (iter-reg registers)
             (if (null? registers)
                 'none ; dummy return variable
                 (begin (define-var (car registers) 0) (iter-reg (cdr registers)))))
-        (iter-reg reg-names)
+
         (define (iter-op operations)
             (if (null? operations)
                 'none ; dummy return variable
-                (begin (add-lisp-func-two-arg (op-name (car op-list)) (op-func (car op-list))))))
-        (iter-op op-list))
+                (begin (newline) (display (op-name (car operations))) (display ": ") (display (op-func (car operations)))
+                                                           (add-lisp-func (op-name (car operations)) (op-func (car operations))) (iter-op (cdr operations)))))
 
-    (list setup instructions)) ; returns setup function and instructions at end
+        (begin (iter-reg reg-names) (iter-op op-list)))
 
-(make-machine '(a b) (list (cons '= =)) '())
+    (cons setup instructions)) ; returns setup function and instructions as a CONS PAIR at end
+
+(define test (make-machine '(a b c d) (list (cons 'rem modulo) (cons '= =))
+                           '(
+
+                             )
+                           ))
+
+(define (run-setup machine) ((car machine)))
 
 (define (run machine)
-    ())
+    (run-setup machine) ; runs setup first
+
+    (define (iter-run instructions)
+        (if (null? instructions) ; if instructions is empty, returns done
+            'done
+            (begin (display (car instructions)) (rml-eval (car instructions)) (iter-run (cdr instructions)))))
+
+    (iter-run (cdr machine))
+    'done)
 
 ;(define (set-register-contents machine reg-name value))
 
-;(define (get-register-contents machine reg-name))
-
-
-;(rml-eval '(const 1))
-(rml-eval '(+ (+ (const 1) (const 2)) (const 100)))
-(rml-eval '(= (const 1) (const 2)))
+(define (get-register-contents machine reg-name) (get-var-value reg-name))
+(run test)
+(get-register-contents test 'b)
+table
 
 
 
