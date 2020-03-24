@@ -150,6 +150,9 @@
     (set-table 'push (lambda (expr) (push (rml-eval (get-contents expr)))))
     (set-table 'pop (lambda (expr) (set-var-value! (cadar (get-contents expr)) (pop)))) ; accesses the reg symbol and binds it to (pop), the top value of the stackj
 
+    ; perform (for writing or running other lisp functions)
+    (set-table 'perform (lambda (expr) (apply (rml-eval (cadr expr)) (map (lambda (element) (rml-eval element)) (cddr expr))))) ; evaluates (op <operation-name>) and applies it to the elements that come after after evaluating the elements with a map
+
     'done)
 
 (install-rml-eval-package)
@@ -232,10 +235,9 @@
 
 (define gcd-machine (make-machine
                       '(a b t)
-                      (list (cons 'rem modulo) (cons '= =))
+                      (list (cons 'rem modulo) (cons '= =) (cons 'write display))
                       '(
-                        (push (reg a))
-                        (pop (reg b))
+                        (perform (op write) (reg a))
                          )))
 (set-register-contents gcd-machine 'a 511)
 (set-register-contents gcd-machine 'b 371)
