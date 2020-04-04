@@ -210,17 +210,15 @@
 
 (define gcd-machine (make-machine
                       '(a b t)
-                      (list (cons 'rem modulo) (cons '= =))
-                      '(test-label
-                         (test (op =) (reg b) (const 0))
-                         (branch (label done-label))
-                         (assign (reg t) (op rem) (reg a) (reg b))
-                         (assign (reg a) (reg b))
-                         (assign (reg b) (reg t))
-                         (goto (label test-label))
-                         done-label)))
+                      (list (cons 'rem modulo) (cons '= =) (cons 'write display))
+                      '(
+                        (perform (op write) (reg a))
+                         )))
 (set-register-contents gcd-machine 'a 511)
 (set-register-contents gcd-machine 'b 371)
 (run gcd-machine) ; returns 'done
 (get-register-contents gcd-machine 'a) ; returns 7
+(get-register-contents gcd-machine 'b) ; returns 7
+stack
+
 

@@ -132,8 +132,10 @@
 
 (install-rml-eval-package)
 
+(define (get-breakpoints machine) (cadr machine))
+(define (get-instructions machine) (car machine))
+
 (define (make-machine reg-names op-list instructions)
-    ; returns setup function and instructions as a CONS PAIR at end
     (define (setup) ; adds all registers to the frame and operations to the table
         ; returns a begin statement that runs the iter functions to set up the registers, operations, and find all locations for label and sets thim in the table
         (define (iter-reg registers)
@@ -145,7 +147,7 @@
             (if (null? operations)
                 'dummy ; dummy return variable
                 (begin (newline) (display (op-name (car operations))) (display ": ") (display (op-func (car operations)))
-                                                           (add-lisp-func (op-name (car operations)) (op-func (car operations))) (iter-op (cdr operations)))))
+                                   (add-lisp-func (op-name (car operations)) (op-func (car operations))) (iter-op (cdr operations)))))
 
         (define (iter-label code)
             (if (null? code)
@@ -158,21 +160,46 @@
 
     (setup) ; runs the setup
 
-    instructions) ; returns setup function and instructions as a CONS PAIR at end
+    (define (print-variables)
+        (define (iter vars)
+            (if (null? vars)
+                (display " ")
+                (begin (newline) (display (car vars)) (display ": ") (display (get-var-value (car vars))) (iter (cdr vars)))))
+        (display "Variables: ")
+        (iter reg-names))
 
-(define test (make-machine '(a b c d) (list (cons 'rem modulo) (cons '= =))
-                           '(
-                             (test (op =) (reg b) (const 0))
-                             (branch (label done-label))
-                             (assign (reg b) (const 5))
-                             done-label
-                             (assign (reg a) (const 10))
-                             )
-                           ))
+    (define breakpoints '())
+    (list instructions breakpoints print-variables)) ; returns instructions and breakpoints (empty list for now) as a CONS PAIR at end
 
-(define (run-setup machine) ((car machine))) ; runs the begin function that was returned in setup
 
 (define (run machine)
+    
+    (define state 'none)
+    (define (set-state! newstate) (set! state newstate)) ; sets the state of the machine
+
+    ; Monitoring
+    (define (print-vars) ((caddr machine)))
+    (define (print-stack) (begin (display "Stack: ") (display stack)))
+    (define (print-current-line instructions) (begin (display "Current line: ") (display (car instructions))))
+    (define (print-instructions instructions) (begin (display "Instructions") (display instructions)))
+
+    (define (master-print instructions)
+        (print-current-line instructions)
+        (newline)
+        (print-vars)
+        (newline)
+        (print-stack)
+        (newline)
+        )
+
+    (define (is-breakpoint? code)
+        (define (iter-check breakpoints)
+            (if (null? breakpoints)
+                #f
+                (if (equal? (car breakpoints) code)
+                    #t
+                    (iter-check (cdr breakpoints)))))
+        (iter-check (get-breakpoints machine)))
 
     (define (needs-instructions? expr) ; checks to see if the expression needing to be evaluated needs to take instructions (except for label)
         (define needs-instructions (list 'test 'goto 'branch)) ; creates a list whose elements are the types of expressions that needs instructions
@@ -186,27 +213,88 @@
 
     (define (iter-run instructions)
         (newline)
-        (if (null? instructions) ; if instructions is empty, returns done
-            'done
-            (if (needs-instructions? (car instructions))
-                (begin (display (car instructions)) (set! instructions ((get-table (get-tag (car instructions))) instructions (car instructions)))) ; all tags that need instructions need to set the instructions to the returned value
-                (if (symbol? (car instructions)) ; evaluates only (car instructions) unless it is a label, which is a symbol
-                    (begin (display (car instructions)) 'label-line) ; if just symbol, then the line of code is a label, where nothing happens
-                    (begin (display (car instructions)) (rml-eval (car instructions)) ))))
+        (cond ((null? instructions) (set! state 'done))
+              ((and (is-breakpoint? instructions) (not (eq? state 'first-line))) (begin (set! state 'breakpoint) (set-car! machine instructions)))
+              ((needs-instructions? (car instructions)) (begin (master-print instructions) (set! instructions ((get-table (get-tag (car instructions))) instructions (car instructions)))))
+              ((symbol? (car instructions)) (begin (display (car instructions)) 'label-line))
+              (else (begin (master-print instructions) (rml-eval (car instructions))))
+              )
+
+        (if (eq? state 'first-line) ; once the program has gone past the first line, sets the state to 'running
+            (set-state! 'running))
+
         (if (null? instructions)
             'done
-            (iter-run (cdr instructions)))
+            (if (not (eq? state 'running))
+                state
+                (iter-run (cdr instructions))))
         )
 
-                
-
-
-    (iter-run machine)
-    'done)
+    (set-state! 'first-line) ; the state of the machine either running, breakpoint, or done
+    (iter-run (get-instructions machine))
+    state)
 
 (define (set-register-contents machine reg-name value) (set-var-value! reg-name value))
 
 (define (get-register-contents machine reg-name) (get-var-value reg-name))
+
+;;; -----------
+;;; BREAKPOINTS
+;;; -----------
+
+
+
+(define (set-breakpoint machine label n)
+
+    (define (post-iter-label code counter) ; goes to x-1 lines of code after the label
+        (if (= counter 0)
+            code
+            (post-iter-label (cdr code) (- counter 1))))
+
+    (define (iter-label code) ; find the labels and runs post-iter-label on the code if found
+        (if (null? code)
+            '()
+            (if (eq? (car code) label)
+                (post-iter-label code n)
+                (begin (newline) (display code) (iter-label (cdr code))))))
+
+    (let ((value (iter-label (car machine))))
+         (if (null? value)
+            'no-breakpoint-set
+            (set-cdr! machine (cons value (cdr machine))))
+         ))
+
+(define (cancel-breakpoint machine label n)
+
+    (define (post-iter-label code counter) ; goes to x-1 lines of code after the label
+        (if (= counter 0)
+            code
+            (post-iter-label (cdr code) (- counter 1))))
+
+    (define (iter-label code) ; find the labels and runs post-iter-label on the code if found
+        (if (null? code)
+            '()
+            (if (eq? (car code) label)
+                (post-iter-label code n)
+                (begin (newline) (display code) (iter-label (cdr code))))))
+
+    (define (remove-breakpoint to-remove breakpoints) ; searches for breakpoint and if it is found, returns the list without the breakpoint in it
+        (if (null? breakpoints)
+            '()
+            (if (eq? to-remove (car breakpoints))
+                (cdr breakpoints) ; skips the element when it is found to remove it
+                (cons (car breakpoints) (remove-breakpoint to-remove (cdr breakpoints))))))
+
+    (let ((value (iter-label (car machine))))
+         (if (null? value)
+            'no-breakpoint-found
+            (let ((breakpoints (get-breakpoints machine)))
+                (
+                 (set! breakpoints (remove-breakpoint (value (get-breakpoints machine))))
+                 )))
+            ;(set-cdr! machine (remove-breakpoint value (cdr machine))))
+         ))
+
 
 (define gcd-machine (make-machine
                       '(a b t)
@@ -219,8 +307,10 @@
                          (assign (reg b) (reg t))
                          (goto (label test-label))
                          done-label)))
+
+
 (set-register-contents gcd-machine 'a 511)
 (set-register-contents gcd-machine 'b 371)
 (run gcd-machine) ; returns 'done
-(get-register-contents gcd-machine 'a) ; returns 7
+
 
