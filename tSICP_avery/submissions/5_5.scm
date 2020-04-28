@@ -25,12 +25,12 @@
 (define machine-vector-ref (cons 'vector-ref (lambda (vec pointer) (vector-ref vec (address pointer)))))
 (define machine-vector-set! (cons 'vector-set! (lambda (vec pointer value) (vector-set! vec (address pointer) value))))
 (define make-null (cons 'make-null (lambda () '())))
-(define increment-pointer (lambda (pointer) (make-pointer (+ (address pointer) 1))))
-(define other-ops (list (cons '= =) (cons 'integer? integer?) (cons 'increment-pointer increment-pointer)))
+(define increment-pointer (cons 'increment-pointer (lambda (pointer) (make-pointer (+ (address pointer) 1)))))
+(define other-ops (list (cons 'eq? eq?) (cons '- -) (cons '+ +) (cons '= =) (cons 'integer? integer?)))
 ; labels are just symbol in my RML simulator
 
 
-(define (get-op-list) (append (list machine-make-pointer machine-vector-ref machine-vector-set! make-null) other-ops)) ; returns a list of all ops to be used in special machine
+(define (get-op-list) (append (list machine-make-pointer machine-vector-ref machine-vector-set! make-null increment-pointer) other-ops)) ; returns a list of all ops to be used in special machine
 
 
 ;; RML code for constructing '(10 20 30):
@@ -56,8 +56,27 @@
         start-c
 
         (assign (reg a) (reg p-val))
+        
 
-        (goto (label done))
+        ;(goto (label done))
+        (assign (reg c) (reg a))
+        (assign (reg b) (const 0)) ; b is counter variable
+
+    pre-list-length
+    (test (op eq?) (perform (op vector-ref) (reg the-cars) (reg c)) (perform (op make-null))) ; checks if c is just empty list 
+        ; line above can also be (test (op eq?) (perform (op vector-ref) (reg the-cars) (reg c)) (perform (op make-null)))
+        ; or ...                                                                            ...  ((op make-null)))
+        ; or ...                                                                            ...  (op make-null))
+        ;, the (op make-null) needs to be run at some point in order to make an empty list, if not fun, its just a function. In test, it does get run when evaluated.
+    (branch (label done))
+    (assign (reg b) (op +) (reg b) (const 1))
+
+    list-length
+        (test (op eq?) (perform (op vector-ref) (reg the-cdrs) (reg c)) (perform (op make-null)))
+        (branch (label done))
+        (assign (reg b) (op +) (reg b) (const 1))
+        (assign (reg c) (perform (op vector-ref) (reg the-cdrs) (reg c)))
+        (goto (label list-length))
 
     cons  ; inputs: p-1, p-2
         (perform (op vector-set!) (reg the-cars) (reg free) (reg p-1))

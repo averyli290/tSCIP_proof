@@ -188,8 +188,8 @@
         (newline)
         ;(print-vars)
         ;(newline)
-        (print-stack)
-        (newline)
+        ;(print-stack)
+        ;(newline)
         )
 
     (define (is-breakpoint? code)
