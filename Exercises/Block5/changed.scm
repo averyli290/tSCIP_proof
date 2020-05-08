@@ -6,7 +6,7 @@
 (define (get-var frame-pair) (car frame-pair))
 (define (get-val frame-pair) (cdr frame-pair))
 
-(define (RM-var-in-frame? var)
+(define (var-in-frame? var)
     (define (iter f)
         (if (null? f)
             #f
@@ -19,12 +19,12 @@
 (define (RM-define-var var value)
     (set! frame (cons (cons var value) frame)))
 
-(define (RM-set-var-value! var value)
+(define (RM-set-var-value var value)
     (define (iter f) ; assumes that the var is already in the frame, returns previous value set for var
         (if (eq? var (get-var (car f)))
             (set-car! f (cons var value))
             (set! f (cons f (iter (cdr f))))))
-    (if (not (RM-var-in-frame? var))
+    (if (not (var-in-frame? var))
         (begin (newline) (display "set-var-value: ") (display var) (error "Variable does not have a value"))
         ;(error "Variable does not have a value")
         (iter frame)))
@@ -87,6 +87,139 @@
         (set-tag 'label expr) ; if the expression is just a symbol, then it is a label
         expr))
 
+
+;;; TEACHER'S HELPER CODE START
+;;; Precompilation for handling cons, car, cdr.
+;;;
+;;; Takes sugared RML with CONS, CAR, CDR as ops
+;;; in the form of a list of lists;
+;;; returns expanded RML that uses subroutines.
+;;;
+;;; For example:
+;;; '((assign (reg a) (const 3))
+;;; (assign (reg val) CONS (const 5) (reg a)))
+;;;
+;;; returns:
+;;; '((assign (reg a) (const 3))
+;;; (assign (reg p-1) (const 5))
+;;; (assign (reg p-2) (reg a))
+;;; (assign (reg p-cont) (label precompile-1))
+;;; (goto cons)
+;;; precompile-1
+;;; (assign (reg val) (reg p-val)))
+(define label-index 0)
+
+(define (main-map line)
+    (cond ((or (not (pair? line)) (< (length line) 3))
+          (list line))
+          ((eq? 'CONS (caddr line))
+          (make-cons line))
+          ((eq? 'CAR (caddr line))
+          (make-car line))
+          ((eq? 'CDR (caddr line))
+          (make-cdr line))
+          ((eq? 'CADR (caddr line))
+          (make-cadr line))
+          ((eq? 'CADDR (caddr line))
+          (make-caddr line))
+          (else
+          (list line))))
+
+(define (make-cons line)
+    (set! label-index (+ 1 label-index))
+    (let ((dest (cadr line))
+          (source-1 (cadddr line))
+          (source-2 (cadddr (cdr line)))
+          (label (symbol-append 'precompile- label-index)))
+    (list (list 'assign '(reg p-1) source-1)
+          (list 'assign '(reg p-2) source-2)
+          (list 'assign '(reg p-cont) (list 'label label))
+          '(goto (label cons))
+          label
+          (list 'assign dest '(reg p-val)))))
+
+
+; CAR: 
+; (assign (reg a) CAR (reg b))
+; turns into:
+; (assign (reg p-1) (reg b))
+; (assign (reg p-cont) (label precompile-x))
+; (goto (label car))
+; precompile-x
+; (assign (reg a) (reg p-val))
+(define (make-car line)
+    (set! label-index (+ 1 label-index))
+    (let ((dest (cadr line))
+        (source (cadddr line))
+        (label (symbol-append 'precompile- label-index)))
+    (list (list 'assign '(reg p-1) source)
+          (list 'assign '(reg p-cont) (list 'label label))
+          (list 'goto '(label car))
+          label
+          (list 'assign dest '(reg p-val)))))
+
+
+(define (make-cdr line)
+    (set! label-index (+ 1 label-index))
+    (let ((dest (cadr line))
+        (source (cadddr line))
+        (label (symbol-append 'precompile- label-index)))
+    (list (list 'assign '(reg p-1) source)
+          (list 'assign '(reg p-cont) (list 'label label))
+          (list 'goto '(label cdr))
+          label
+          (list 'assign dest '(reg p-val)))))
+
+;;; oh, I'm so clever...
+(define (make-cadr line)
+    (let ((dest (cadr line))
+        (source (cadddr line)))
+    (list (list 'assign dest 'CDR source)
+          (list 'assign dest 'CAR dest))))
+
+(define (make-caddr line) 
+    (let ((dest (cadr line))
+        (source (cadddr line)))
+    (list (list 'assign dest 'CDR source)
+          (list 'assign dest 'CDR dest)
+          (list 'assign dest 'CAR dest))))
+
+(define (loop-once RML)
+    (fold-left append '() (map main-map RML)))
+
+(define (precompile-RML RML)
+    (loop-once (loop-once RML)))
+
+
+;;; printing vectors
+(define (print-vector v start end)
+    (if (= start end)
+        '.
+        (begin (display start) (display ":") (display (vector-ref v start)) (display "  ") (print-vector v (+ 1 start) end))))
+
+
+;; Convert a nested list of list of... into vector format.
+;; Input f is the current free index.
+;; Returns the next free index.
+(define (lisp-to-vectors obj f v-cars v-cdrs)
+    (define (setup-cars obj f)
+        (cond ((not (pair? (car obj)))
+                (vector-set! v-cars f (car obj))
+                (+ 1 f))
+              (else
+                (vector-set! v-cars f (make-pointer (+ 1 f)))
+                (lisp-to-vectors (car obj) (+ 1 f) v-cars v-cdrs))))
+
+    (cond ((not (pair? (cdr obj)))
+            (vector-set! v-cdrs f (cdr obj))
+            (setup-cars obj f))
+          (else
+            (let ((new-free (setup-cars obj f))) ; do cars before cdrs
+            (vector-set! v-cdrs f (make-pointer new-free))
+            (lisp-to-vectors (cdr obj) new-free v-cars v-cdrs)))))
+
+;;; TEACHER'S HELPER CODE END
+
 (define (rml-eval expr)
     (let ((to-be-evaled (pre-eval expr))) ; pre-evals the expr to see if label first, then looks up tag in table and applies corresponding function
         (let ((table-value (get-table (get-tag to-be-evaled))))
@@ -107,7 +240,7 @@
     (set-table 'reg (lambda (expr) (RM-get-var-value (car (get-contents expr)))))
 
     (set-table 'label (lambda (expr) (RM-get-var-value (car (get-contents expr)))))
-    (set-table 'assign (lambda (expr) (RM-set-var-value! (cadar (get-contents expr)) (rml-eval (cdr (get-contents expr)))))) ; assign sets the value of var, which is (cadar (get-contents expr)), where expr is (assign (reg a) (other thing))
+    (set-table 'assign (lambda (expr) (RM-set-var-value (cadar (get-contents expr)) (rml-eval (cdr (get-contents expr)))))) ; assign sets the value of var, which is (cadar (get-contents expr)), where expr is (assign (reg a) (other thing))
     (set-table 'op (lambda (expr) (get-table (car (get-contents expr)))))
     (add-lisp-func '+ +)
     (add-lisp-func '- +)
@@ -123,7 +256,7 @@
 
     ; stack functions 
     (set-table 'push (lambda (expr) (push (rml-eval (get-contents expr)))))
-    (set-table 'pop (lambda (expr) (RM-set-var-value! (cadar (get-contents expr)) (pop)))) ; accesses the reg symbol and binds it to (pop), the top value of the stackj
+    (set-table 'pop (lambda (expr) (RM-set-var-value (cadar (get-contents expr)) (pop)))) ; accesses the reg symbol and binds it to (pop), the top value of the stackj
 
     ; perform (for writing or running other lisp functions)
     (set-table 'perform (lambda (expr) (apply (rml-eval (cadr expr)) (map (lambda (element) (rml-eval element)) (cddr expr))))) ; evaluates (op <operation-name>) and applies it to the elements that come after after evaluating the elements with a map
@@ -135,30 +268,37 @@
 (define (get-breakpoints machine) (cadr machine))
 (define (get-instructions machine) (car machine))
 
+; helper functions for the machine
+
+(define (add-registers registers) ; adds registers to the table
+    (if (null? registers)
+        'dummy ; dummy return variable
+        (begin (RM-define-var (car registers) 0) (add-registers (cdr registers)))))
+
+(define (add-ops operations) ; adds operations to the table
+    (if (null? operations)
+        'dummy ; dummy return variable
+        (begin (newline) (display (op-name (car operations))) (display ": ") (display (op-func (car operations)))
+                       (add-lisp-func (op-name (car operations)) (op-func (car operations))) (add-ops (cdr operations)))))
+
+
+(define (add-labels code) ; adds all of the labels to the table
+    (if (null? code)
+        'dummy
+        (if (symbol? (car code)) ; tests to see if there is a label
+            (begin (RM-define-var (car code) (cdr code)) (add-labels (cdr code))) ; adds the label-code pair to the table
+                (add-labels (cdr code)))))
+
 (define (make-machine reg-names op-list instructions)
+
     (define (setup) ; adds all registers to the frame and operations to the table
         ; returns a begin statement that runs the iter functions to set up the registers, operations, and find all locations for label and sets thim in the table
-        (define (iter-reg registers)
-            (if (null? registers)
-                'dummy ; dummy return variable
-                (begin (RM-define-var (car registers) 0) (iter-reg (cdr registers)))))
 
-        (define (iter-op operations)
-            (if (null? operations)
-                'dummy ; dummy return variable
-                (begin (newline) (display (op-name (car operations))) (display ": ") (display (op-func (car operations)))
-                                   (add-lisp-func (op-name (car operations)) (op-func (car operations))) (iter-op (cdr operations)))))
 
-        (define (iter-label code)
-            (if (null? code)
-                'dummy
-                (if (symbol? (car code)) ; tests to see if there is a label
-                    (begin (RM-define-var (car code) (cdr code)) (iter-label (cdr code))) ; adds the label-code pair to the table
-                    (iter-label (cdr code)))))
-
-        (begin (iter-reg reg-names) (iter-op op-list) (iter-label instructions)))
+        (begin (add-registers reg-names) (add-ops op-list)))
 
     (setup) ; runs the setup
+
 
     (define (print-variables)
         (define (iter vars)
@@ -171,8 +311,38 @@
     (define breakpoints '())
     (list instructions breakpoints print-variables)) ; returns instructions and breakpoints (empty list for now) as a CONS PAIR at end
 
+(define (add-cons-car-cdr machine)
+    ; adds the ability to use cons car and cdr with the proper setup and use of labels by adding RML to the end of the machine
+    (define updated-instructions (append (get-instructions machine)
+    '(
+    cons  ; inputs: p-1, p-2
+        (perform (op vector-set!) (reg the-cars) (reg free) (reg p-1))
+        (perform (op vector-set!) (reg the-cdrs) (reg free) (reg p-2))
+        (assign (reg p-val) (reg free)) ; assignes p-val to free, allows user to get the pointer that points to the cons pair
+        (assign (reg free) ((op increment-pointer) (reg free))) ; increments free
+        (goto (label p-cont))
+
+    car  ; input: p-1
+        (assign (reg p-val) (perform (op vector-ref) (reg the-cars) (reg p-1)))
+        (perform (op vector-ref) (reg the-cars) (reg p-1))
+        (goto (reg p-cont))
+
+    cdr ; input: p-1
+        (assign (reg p-val) (perform (op vector-ref) (reg the-cdrs) (reg p-1)))
+        (perform (op vector-ref) (reg the-cdrs) (reg p-1))
+        (goto (reg p-cont))
+    )))
+
+    (set-car! machine updated-instructions)
+
+    )
 
 (define (run machine)
+
+    (add-cons-car-cdr machine)
+    (define precompiled-instructions (precompile-RML (get-instructions machine)))
+    (set-car! machine precompiled-instructions) ; setting the new instructions
+    (add-labels precompiled-instructions) ; setting all of the labels to the table 
     
     (define state 'none)
     (define (set-state! newstate) (set! state newstate)) ; sets the state of the machine
@@ -185,11 +355,6 @@
 
     (define (master-print instructions)
         (print-current-line instructions)
-        (newline)
-        (display (get-register-contents machine 'the-cars))
-        (newline)
-        (display (get-register-contents machine 'the-cdrs))
-        (newline)
         ;(newline)
         ;(print-vars)
         ;(newline)
@@ -239,7 +404,7 @@
     (iter-run (get-instructions machine))
     state)
 
-(define (set-register-contents machine reg-name value) (RM-set-var-value! reg-name value))
+(define (set-register-contents machine reg-name value) (RM-set-var-value reg-name value))
 
 (define (get-register-contents machine reg-name) (RM-get-var-value reg-name))
 
@@ -251,19 +416,19 @@
 
 (define (set-breakpoint machine label n)
 
-    (define (post-iter-label code counter) ; goes to x-1 lines of code after the label
+    (define (post-add-labels code counter) ; goes to x-1 lines of code after the label
         (if (= counter 0)
             code
-            (post-iter-label (cdr code) (- counter 1))))
+            (post-add-labels (cdr code) (- counter 1))))
 
-    (define (iter-label code) ; find the labels and runs post-iter-label on the code if found
+    (define (add-labels code) ; find the labels and runs post-add-labels on the code if found
         (if (null? code)
             '()
             (if (eq? (car code) label)
-                (post-iter-label code n)
-                (begin (newline) (display code) (iter-label (cdr code))))))
+                (post-add-labels code n)
+                (begin (newline) (display code) (add-labels (cdr code))))))
 
-    (let ((value (iter-label (car machine))))
+    (let ((value (add-labels (car machine))))
          (if (null? value)
             'no-breakpoint-set
             (set-cdr! machine (cons value (cdr machine))))
@@ -271,17 +436,17 @@
 
 (define (cancel-breakpoint machine label n)
 
-    (define (post-iter-label code counter) ; goes to x-1 lines of code after the label
+    (define (post-add-labels code counter) ; goes to x-1 lines of code after the label
         (if (= counter 0)
             code
-            (post-iter-label (cdr code) (- counter 1))))
+            (post-add-labels (cdr code) (- counter 1))))
 
-    (define (iter-label code) ; find the labels and runs post-iter-label on the code if found
+    (define (add-labels code) ; find the labels and runs post-add-labels on the code if found
         (if (null? code)
             '()
             (if (eq? (car code) label)
-                (post-iter-label code n)
-                (begin (newline) (display code) (iter-label (cdr code))))))
+                (post-add-labels code n)
+                (begin (newline) (display code) (add-labels (cdr code))))))
 
     (define (remove-breakpoint to-remove breakpoints) ; searches for breakpoint and if it is found, returns the list without the breakpoint in it
         (if (null? breakpoints)
@@ -290,7 +455,7 @@
                 (cdr breakpoints) ; skips the element when it is found to remove it
                 (cons (car breakpoints) (remove-breakpoint to-remove (cdr breakpoints))))))
 
-    (let ((value (iter-label (car machine))))
+    (let ((value (add-labels (car machine))))
          (if (null? value)
             'no-breakpoint-found
             (let ((breakpoints (get-breakpoints machine)))
@@ -312,8 +477,8 @@
 ;                         (assign (reg b) (reg t))
 ;                         (goto (label test-label))
 ;                         done-label)))
-;
-;
+
+
 ;(set-register-contents gcd-machine 'a 511)
 ;(set-register-contents gcd-machine 'b 371)
 ;(run gcd-machine) ; returns 'done

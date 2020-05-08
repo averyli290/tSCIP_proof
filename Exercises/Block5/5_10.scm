@@ -1,12 +1,12 @@
 (load "RM_simulator_5_10.scm")
-
+(load "helper-functions.scm")
 
 
 ;#####################
 ;# VECTORS & REGISTERS
 ;#####################
 
-(define MAX_MEMORY_SIZE 20)
+(define MAX_MEMORY_SIZE 15)
 
 ;##########
 ;# POINTERS
@@ -148,7 +148,29 @@
     (assign (reg exp) CONS (const y) (reg exp))
     (assign (reg argl) CONS (const 17) (op make-null))
     (assign (reg argl) CONS (const 18) (reg argl))
+    (goto (label done))
     (assign (reg env) (op extend-environment) (reg exp) (reg argl) (reg env))
+    ;done
+
+    cons  ; inputs: p-1, p-2
+        (perform (op vector-set!) (reg the-cars) (reg free) (reg p-1))
+        (perform (op vector-set!) (reg the-cdrs) (reg free) (reg p-2))
+        (assign (reg p-val) (reg free)) ; assignes p-val to free, allows user to get the pointer that points to the cons pair
+        (assign (reg free) ((op increment-pointer) (reg free))) ; increments free
+        (goto (label p-cont))
+
+    car  ; input: p-1
+        (assign (reg p-val) (perform (op vector-ref) (reg the-cars) (reg p-1)))
+        (perform (op vector-ref) (reg the-cars) (reg p-1))
+        (goto (reg p-cont))
+
+    cdr ; input: p-1
+        (assign (reg p-val) (perform (op vector-ref) (reg the-cdrs) (reg p-1)))
+        (perform (op vector-ref) (reg the-cdrs) (reg p-1))
+        (goto (reg p-cont))
+
+    done
+
     ))
 
 
@@ -158,18 +180,19 @@
     (set-register-contents machine 'the-cars glob-mac-cars)
     (set-register-contents machine 'the-cdrs glob-mac-cdrs)
     (set-register-contents machine 'free (make-pointer 0))
+    (set-register-contents machine 'p-cont '(label done))
 
     machine ; have to return modified machine back
 
     )
 
-(define (make-special-machine) (post-process (make-machine '(env val exp argl a b c the-cars the-cdrs free p-1 p-2 p-val p-cont) (get-op-list) (get-RML))))
+(define (make-special-machine) (post-process (make-machine '(env val exp argl a b c the-cars the-cdrs free p-1 p-2 p-val p-cont) (get-op-list) (precompile-RML (get-RML)))))
 
 
 (define glob-mac (make-special-machine))
 (run glob-mac)
 
-(get-register-contents glob-mac 'val)
+;(get-register-contents glob-mac 'p-cont)
 glob-mac-cars
 glob-mac-cdrs
 ;(get-register-contents test 'the-cdrs)
@@ -177,4 +200,11 @@ glob-mac-cdrs
 ;(get-register-contents test 'a)
 ;(get-register-contents test 'b)
 ;(get-register-contents test 'c)
+
+(define (iter l)
+    (if (null? l)
+        'dummy
+        (begin (newline) (display (car l)) (iter (cdr l)))))
+
+;(iter (car glob-mac))
 
