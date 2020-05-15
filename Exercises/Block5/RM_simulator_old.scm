@@ -6,7 +6,7 @@
 (define (get-var frame-pair) (car frame-pair))
 (define (get-val frame-pair) (cdr frame-pair))
 
-(define (RM-var-in-frame? var)
+(define (var-in-frame? var)
     (define (iter f)
         (if (null? f)
             #f
@@ -16,23 +16,23 @@
     (iter frame))
 
 
-(define (RM-define-var var value)
+(define (define-var var value)
     (set! frame (cons (cons var value) frame)))
 
-(define (RM-set-var-value! var value)
+(define (set-var-value! var value)
     (define (iter f) ; assumes that the var is already in the frame, returns previous value set for var
         (if (eq? var (get-var (car f)))
             (set-car! f (cons var value))
             (set! f (cons f (iter (cdr f))))))
-    (if (not (RM-var-in-frame? var))
+    (if (not (var-in-frame? var))
         (begin (newline) (display "set-var-value: ") (display var) (error "Variable does not have a value"))
         ;(error "Variable does not have a value")
         (iter frame)))
 
-(define (RM-get-var-value var)
+(define (get-var-value var)
     (define (iter f)
         (if (null? f)
-            (begin (newline) (display "RM-get-var-value: ") (display var) (error "Variable does not have a value"))
+            (begin (newline) (display "get-var-value: ") (display var) (error "Variable does not have a value"))
             (if (eq? var (get-var (car f)))
                 (get-val (car f))
                 (iter (cdr f)))))
@@ -104,10 +104,10 @@
 (define (install-rml-eval-package)
     
     (set-table 'const (lambda (expr) (car (get-contents expr))))
-    (set-table 'reg (lambda (expr) (RM-get-var-value (car (get-contents expr)))))
+    (set-table 'reg (lambda (expr) (get-var-value (car (get-contents expr)))))
 
-    (set-table 'label (lambda (expr) (RM-get-var-value (car (get-contents expr)))))
-    (set-table 'assign (lambda (expr) (RM-set-var-value! (cadar (get-contents expr)) (rml-eval (cdr (get-contents expr)))))) ; assign sets the value of var, which is (cadar (get-contents expr)), where expr is (assign (reg a) (other thing))
+    (set-table 'label (lambda (expr) (get-var-value (car (get-contents expr)))))
+    (set-table 'assign (lambda (expr) (set-var-value! (cadar (get-contents expr)) (rml-eval (cdr (get-contents expr)))))) ; assign sets the value of var, which is (cadar (get-contents expr)), where expr is (assign (reg a) (other thing))
     (set-table 'op (lambda (expr) (get-table (car (get-contents expr)))))
     (add-lisp-func '+ +)
     (add-lisp-func '- +)
@@ -115,7 +115,7 @@
     (add-lisp-func '/ /)
 
     ; functions that need instructions
-    (set-table 'goto (lambda (instructions expr) (cons (cadr expr) (rml-eval (cadr expr))))) ; need to return ('label (RM-get-var-value label)) because the instructions iteration needs to run (RM-get-var-value label) and it uses cdr 
+    (set-table 'goto (lambda (instructions expr) (cons (cadr expr) (rml-eval (cadr expr))))) ; need to return ('label (get-var-value label)) because the instructions iteration needs to run (get-var-value label) and it uses cdr 
     (set-table 'branch (lambda (instructions expr) ((get-table 'goto) instructions expr))) ; branch is the same as goto
     (set-table 'test (lambda (instructions expr) (if (rml-eval (cdar instructions))
                                                      instructions
@@ -123,7 +123,7 @@
 
     ; stack functions 
     (set-table 'push (lambda (expr) (push (rml-eval (get-contents expr)))))
-    (set-table 'pop (lambda (expr) (RM-set-var-value! (cadar (get-contents expr)) (pop)))) ; accesses the reg symbol and binds it to (pop), the top value of the stackj
+    (set-table 'pop (lambda (expr) (set-var-value! (cadar (get-contents expr)) (pop)))) ; accesses the reg symbol and binds it to (pop), the top value of the stackj
 
     ; perform (for writing or running other lisp functions)
     (set-table 'perform (lambda (expr) (apply (rml-eval (cadr expr)) (map (lambda (element) (rml-eval element)) (cddr expr))))) ; evaluates (op <operation-name>) and applies it to the elements that come after after evaluating the elements with a map
@@ -141,7 +141,7 @@
         (define (iter-reg registers)
             (if (null? registers)
                 'dummy ; dummy return variable
-                (begin (RM-define-var (car registers) 0) (iter-reg (cdr registers)))))
+                (begin (define-var (car registers) 0) (iter-reg (cdr registers)))))
 
         (define (iter-op operations)
             (if (null? operations)
@@ -153,7 +153,7 @@
             (if (null? code)
                 'dummy
                 (if (symbol? (car code)) ; tests to see if there is a label
-                    (begin (RM-define-var (car code) (cdr code)) (iter-label (cdr code))) ; adds the label-code pair to the table
+                    (begin (define-var (car code) (cdr code)) (iter-label (cdr code))) ; adds the label-code pair to the table
                     (iter-label (cdr code)))))
 
         (begin (iter-reg reg-names) (iter-op op-list) (iter-label instructions)))
@@ -164,7 +164,7 @@
         (define (iter vars)
             (if (null? vars)
                 (display " ")
-                (begin (newline) (display (car vars)) (display ": ") (display (RM-get-var-value (car vars))) (iter (cdr vars)))))
+                (begin (newline) (display (car vars)) (display ": ") (display (get-var-value (car vars))) (iter (cdr vars)))))
         (display "Variables: ")
         (iter reg-names))
 
@@ -185,16 +185,11 @@
 
     (define (master-print instructions)
         (print-current-line instructions)
-        ;(newline)
-        ;(display (get-register-contents machine 'the-cars))
-        ;(newline)
-        ;(display (get-register-contents machine 'the-cdrs))
-        ;(newline)
-        ;(newline)
+        (newline)
         ;(print-vars)
         ;(newline)
-        ;(print-stack)
-        ;(newline)
+        (print-stack)
+        (newline)
         )
 
     (define (is-breakpoint? code)
@@ -239,9 +234,9 @@
     (iter-run (get-instructions machine))
     state)
 
-(define (set-register-contents machine reg-name value) (RM-set-var-value! reg-name value))
+(define (set-register-contents machine reg-name value) (set-var-value! reg-name value))
 
-(define (get-register-contents machine reg-name) (RM-get-var-value reg-name))
+(define (get-register-contents machine reg-name) (get-var-value reg-name))
 
 ;;; -----------
 ;;; BREAKPOINTS
@@ -301,21 +296,21 @@
          ))
 
 
-;(define gcd-machine (make-machine
-;                      '(a b t)
-;                      (list (cons 'rem modulo) (cons '= =))
-;                      '(test-label
-;                         (test (op =) (reg b) (const 0))
-;                         (branch (label done-label))
-;                         (assign (reg t) (op rem) (reg a) (reg b))
-;                         (assign (reg a) (reg b))
-;                         (assign (reg b) (reg t))
-;                         (goto (label test-label))
-;                         done-label)))
-;
-;
-;(set-register-contents gcd-machine 'a 511)
-;(set-register-contents gcd-machine 'b 371)
-;(run gcd-machine) ; returns 'done
+(define gcd-machine (make-machine
+                      '(a b t)
+                      (list (cons 'rem modulo) (cons '= =))
+                      '(test-label
+                         (test (op =) (reg b) (const 0))
+                         (branch (label done-label))
+                         (assign (reg t) (op rem) (reg a) (reg b))
+                         (assign (reg a) (reg b))
+                         (assign (reg b) (reg t))
+                         (goto (label test-label))
+                         done-label)))
+
+
+(set-register-contents gcd-machine 'a 511)
+(set-register-contents gcd-machine 'b 371)
+(run gcd-machine) ; returns 'done
 
 

@@ -1,4 +1,4 @@
-(load "RM_simulator.scm")
+(load "RM_simulator_5_10.scm")
 (load "helper-functions.scm")
 
 
@@ -150,6 +150,7 @@
     (assign (reg argl) CONS (const 18) (reg argl))
     (goto (label done))
     (assign (reg env) (op extend-environment) (reg exp) (reg argl) (reg env))
+    ;done
 
     cons  ; inputs: p-1, p-2
         (perform (op vector-set!) (reg the-cars) (reg free) (reg p-1))
@@ -179,6 +180,7 @@
     (set-register-contents machine 'the-cars glob-mac-cars)
     (set-register-contents machine 'the-cdrs glob-mac-cdrs)
     (set-register-contents machine 'free (make-pointer 0))
+    (set-register-contents machine 'p-cont '(label done))
 
     machine ; have to return modified machine back
 

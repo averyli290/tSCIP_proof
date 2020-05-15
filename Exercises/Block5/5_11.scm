@@ -66,7 +66,7 @@
 ;; Our standard API.
 (define (lookup-var-value var env)
     (if (null? env)
-        (error "Variable not found by lookup-var-value!")
+        (begin (newline) (display var) (error "Variable not found by lookup-var-value!"))
         (let ((value-list (scan-frame var (frame-vars (top-frame env))
                                      (frame-values (top-frame env)))))
             (if value-list
@@ -86,17 +86,6 @@
                 (set-var-value! var value (enclosing-env env))))))
 
 (define (define-var! var value env) 
-    ;(newline)
-    ;(display (scan-frame var (frame-vars (top-frame env)) (frame-values (top-frame env))))
-    ;(display (frame-vars (top-frame env)))
-    ;(display "env: ")
-    ;(display (top-frame env))
-    ;(newline)
-    ;(define env (top-frame env-pointer))
-    ;(newline)
-    ;(display (frame-vars (top-frame env)))
-    ;(define env (top-frame env-pointer))
-    ;(frame-vars (top-frame env))
       (let ((value-list (scan-frame var (frame-vars (top-frame env))
             (frame-values (top-frame env)))))
             (if value-list
@@ -128,7 +117,7 @@
 (define machine-vector-set! (cons 'vector-set! (lambda (vec pointer value) (vector-set! vec (address pointer) value))))
 (define make-null (cons 'make-null (lambda () '())))
 (define increment-pointer (cons 'increment-pointer (lambda (pointer) (make-pointer (+ (address pointer) 1)))))
-(define other-ops (list (cons 'eq? eq?) (cons '- -) (cons '+ +) (cons '= =) (cons 'integer? integer?)))
+(define other-ops (list (cons 'eq? eq?) (cons 'null? null?) (cons 'display display) (cons '- -) (cons '+ +) (cons '= =) (cons 'symbol? symbol?) (cons 'number? number?) (cons 'integer? integer?)))
 ; labels are just symbol in my RML simulator
 
 
@@ -141,15 +130,70 @@
 (define (get-RML)
   '(
     (assign (reg env) (op make-environment))
-    (perform (op define-var!) (const r) (const 13) (reg env))
-    (perform (op define-var!) (const s) (const 14) (reg env))
-    (assign (reg val) (op lookup-var-value) (const s) (reg env))
-    (assign (reg exp) CONS (const x) (op make-null))
-    (assign (reg exp) CONS (const y) (reg exp))
-    (assign (reg argl) CONS (const 17) (op make-null))
-    (assign (reg argl) CONS (const 18) (reg argl))
-    (goto (label done))
-    (assign (reg env) (op extend-environment) (reg exp) (reg argl) (reg env))
+
+    (assign (reg temp-var) (op make-null)) ; making ((define x (+ 1 3) '()) x '())
+    (assign (reg program) CONS (const 3) (reg temp-var))
+    (assign (reg program) CONS (const 1) (reg program))
+    (assign (reg program) CONS (const +) (reg program))
+    (assign (reg program) CONS (reg program) (reg temp-var))
+    (assign (reg program) CONS (const x) (reg program))
+    (assign (reg program) CONS (const define) (reg program))
+    (assign (reg temp-var) CONS (const x) (reg temp-var))
+    (assign (reg program) CONS (reg program) (reg temp-var))
+
+
+    ;(assign (reg temp-var) (op make-null))
+    ;(assign (reg program) CONS (const 4) (reg temp-var)) ; creating ((define x 4))
+    ;(assign (reg program) CONS (const x) (reg program))
+    ;(assign (reg program) CONS (const define) (reg program))
+
+    ;(assign (reg temp-var) CONS (const x) (reg temp-var))
+    ;(assign (reg program) CONS (reg program) (reg temp-var))
+
+
+    eval-loop
+        (test (op null?) (reg program)) ; tests if program is null
+        (branch (label done)) ; if so, goes to label done
+        (assign (reg continue) (label eval-loop))
+        (assign (reg exp) CAR (reg program))
+        (assign (reg program) CDR (reg program))
+        (goto (label eval))
+
+    eval ; testing to see what to use to evaluate exp (expression)
+        (test (op number?) (reg exp))
+        (branch (label ev-self-evalutating))
+        (test (op symbol?) (reg exp))
+        (branch (label ev-variable))
+        (assign (reg temp-var) CAR (reg exp))
+        (test (op eq?) (const define) (reg temp-var))
+        (branch (label ev-define))
+
+        (assign (reg temp-1) CADR (reg exp)) ; TEMPORARY for evaluating ((define x (+ 1 3) '()) x '())
+        (assign (reg temp-2) CADDR (reg exp))
+        (assign (reg val) (op +) (reg temp-1) (reg temp-2))
+        (goto (reg continue))
+
+    ev-self-evalutating
+        (assign (reg val) (reg exp))
+        (goto (reg continue)) ; goes to the label stored in continue after any evaluation
+
+    ev-variable
+        (assign (reg val) (perform (op lookup-var-value) (reg exp) (reg env))) ; looking up the value of the variable in the environment
+        (goto (reg continue)) ; goes to the label stored in continue after any evaluation
+
+    ev-define
+        (push (reg exp)) ; saving the state of exp and continue
+        (push (reg continue))
+        (assign (reg exp) CADDR (reg exp)) ; getting the sub expression part of (define x sub-expr) !!! Has to be CADDR
+        (assign (reg continue) (label ev-define-2)) ; setting continue
+        (goto (reg eval)) ; evaluating the sub expression
+    ev-define-2 ; second define label so it can assign the first argument to the result of evaluating second argument
+        (pop (reg continue)) ; getting continue back
+        (pop (reg exp))
+        (assign (reg temp-var) CADR (reg exp)) ; getting the to-define part of (define to-define sub-expr)
+        (perform (op define-var!) (reg temp-var) (reg val) (reg env)) ; defining the variable with the result of the evaluated sub expression
+        (goto (reg continue)) ; finally goes to continue
+
 
     cons  ; inputs: p-1, p-2
         (perform (op vector-set!) (reg the-cars) (reg free) (reg p-1))
@@ -179,30 +223,20 @@
     (set-register-contents machine 'the-cars glob-mac-cars)
     (set-register-contents machine 'the-cdrs glob-mac-cdrs)
     (set-register-contents machine 'free (make-pointer 0))
+    (set-register-contents machine 'p-cont '(label done))
 
     machine ; have to return modified machine back
 
     )
 
-(define (make-special-machine) (post-process (make-machine '(env val exp argl a b c the-cars the-cdrs free p-1 p-2 p-val p-cont) (get-op-list) (precompile-RML (get-RML)))))
+(define (make-special-machine) (post-process (make-machine '(temp-1 temp-2 program temp-var continue val env exp argl the-cars the-cdrs free p-1 p-2 p-val p-cont) (get-op-list) (precompile-RML (get-RML)))))
 
 
 (define glob-mac (make-special-machine))
 (run glob-mac)
 
-;(get-register-contents glob-mac 'p-cont)
+(get-register-contents glob-mac 'exp)
+(get-register-contents glob-mac 'val)
 glob-mac-cars
 glob-mac-cdrs
-;(get-register-contents test 'the-cdrs)
-;(get-register-contents test 'free)
-;(get-register-contents test 'a)
-;(get-register-contents test 'b)
-;(get-register-contents test 'c)
-
-(define (iter l)
-    (if (null? l)
-        'dummy
-        (begin (newline) (display (car l)) (iter (cdr l)))))
-
-;(iter (car glob-mac))
 

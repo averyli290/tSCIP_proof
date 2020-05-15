@@ -1,12 +1,13 @@
 (load "RM_simulator.scm")
 (load "helper-functions.scm")
+(load "5_12_RML.scm")
 
 
 ;#####################
 ;# VECTORS & REGISTERS
 ;#####################
 
-(define MAX_MEMORY_SIZE 15)
+(define MAX_MEMORY_SIZE 125)
 
 ;##########
 ;# POINTERS
@@ -66,7 +67,7 @@
 ;; Our standard API.
 (define (lookup-var-value var env)
     (if (null? env)
-        (error "Variable not found by lookup-var-value!")
+        (begin (newline) (display var) (error "Variable not found by lookup-var-value!"))
         (let ((value-list (scan-frame var (frame-vars (top-frame env))
                                      (frame-values (top-frame env)))))
             (if value-list
@@ -86,17 +87,6 @@
                 (set-var-value! var value (enclosing-env env))))))
 
 (define (define-var! var value env) 
-    ;(newline)
-    ;(display (scan-frame var (frame-vars (top-frame env)) (frame-values (top-frame env))))
-    ;(display (frame-vars (top-frame env)))
-    ;(display "env: ")
-    ;(display (top-frame env))
-    ;(newline)
-    ;(define env (top-frame env-pointer))
-    ;(newline)
-    ;(display (frame-vars (top-frame env)))
-    ;(define env (top-frame env-pointer))
-    ;(frame-vars (top-frame env))
       (let ((value-list (scan-frame var (frame-vars (top-frame env))
             (frame-values (top-frame env)))))
             (if value-list
@@ -128,7 +118,7 @@
 (define machine-vector-set! (cons 'vector-set! (lambda (vec pointer value) (vector-set! vec (address pointer) value))))
 (define make-null (cons 'make-null (lambda () '())))
 (define increment-pointer (cons 'increment-pointer (lambda (pointer) (make-pointer (+ (address pointer) 1)))))
-(define other-ops (list (cons 'eq? eq?) (cons '- -) (cons '+ +) (cons '= =) (cons 'integer? integer?)))
+(define other-ops (list (cons 'eq? eq?) (cons 'null? null?) (cons 'display display) (cons '- -) (cons '+ +) (cons '= =) (cons 'symbol? symbol?) (cons 'number? number?) (cons 'integer? integer?)))
 ; labels are just symbol in my RML simulator
 
 
@@ -136,73 +126,55 @@
 
 
 
-;; RML code for constructing '(10 20 30):
+;; Convert a nested list of list of... into vector format.
+;; Input f is the current free index.
+;; Returns the next free index.
+(define (lisp-to-vectors obj f v-cars v-cdrs)
+    (define (setup-cars obj f)
+        (cond ((not (pair? (car obj)))
+                (vector-set! v-cars f (car obj))
+                (+ 1 f))
+              (else
+                (vector-set! v-cars f (make-pointer (+ 1 f)))
+                (lisp-to-vectors (car obj) (+ 1 f) v-cars v-cdrs))))
 
-(define (get-RML)
-  '(
-    (assign (reg env) (op make-environment))
-    (perform (op define-var!) (const r) (const 13) (reg env))
-    (perform (op define-var!) (const s) (const 14) (reg env))
-    (assign (reg val) (op lookup-var-value) (const s) (reg env))
-    (assign (reg exp) CONS (const x) (op make-null))
-    (assign (reg exp) CONS (const y) (reg exp))
-    (assign (reg argl) CONS (const 17) (op make-null))
-    (assign (reg argl) CONS (const 18) (reg argl))
-    (goto (label done))
-    (assign (reg env) (op extend-environment) (reg exp) (reg argl) (reg env))
-
-    cons  ; inputs: p-1, p-2
-        (perform (op vector-set!) (reg the-cars) (reg free) (reg p-1))
-        (perform (op vector-set!) (reg the-cdrs) (reg free) (reg p-2))
-        (assign (reg p-val) (reg free)) ; assignes p-val to free, allows user to get the pointer that points to the cons pair
-        (assign (reg free) ((op increment-pointer) (reg free))) ; increments free
-        (goto (label p-cont))
-
-    car  ; input: p-1
-        (assign (reg p-val) (perform (op vector-ref) (reg the-cars) (reg p-1)))
-        (perform (op vector-ref) (reg the-cars) (reg p-1))
-        (goto (reg p-cont))
-
-    cdr ; input: p-1
-        (assign (reg p-val) (perform (op vector-ref) (reg the-cdrs) (reg p-1)))
-        (perform (op vector-ref) (reg the-cdrs) (reg p-1))
-        (goto (reg p-cont))
-
-    done
-
-    ))
+    (cond ((not (pair? (cdr obj)))
+            (vector-set! v-cdrs f (cdr obj))
+            (setup-cars obj f))
+          (else
+            (let ((new-free (setup-cars obj f))) ; do cars before cdrs
+            (vector-set! v-cdrs f (make-pointer new-free))
+            (lisp-to-vectors (cdr obj) new-free v-cars v-cdrs)))))
 
 
 
 (define (post-process machine)
+    ; loading the program in
+    ;(define free-index 0) ; making value for storing free index
+    (define free-index (lisp-to-vectors (the-program) 0 glob-mac-cars glob-mac-cdrs))
+    (set-register-contents machine 'program (make-pointer 0))
+
     ; function that sets the machine up for the special machine
     (set-register-contents machine 'the-cars glob-mac-cars)
     (set-register-contents machine 'the-cdrs glob-mac-cdrs)
-    (set-register-contents machine 'free (make-pointer 0))
+    (set-register-contents machine 'free (make-pointer free-index))
+    (set-register-contents machine 'p-cont '(label done))
+    (set-register-contents machine 'null '())
 
     machine ; have to return modified machine back
 
     )
 
-(define (make-special-machine) (post-process (make-machine '(env val exp argl a b c the-cars the-cdrs free p-1 p-2 p-val p-cont) (get-op-list) (precompile-RML (get-RML)))))
+(define (get-registers) '(the-cars the-cdrs free temp-1 temp-2 temp-var temp-val null exp env proc val unev argl continue program p-1 p-2 p-val p-cont))
+;(define (make-special-machine) (post-process (make-machine '(null temp-1 temp-2 program temp-var continue val env exp argl the-cars the-cdrs free p-1 p-2 p-val p-cont) (get-op-list) (precompile-RML (get-RML)))))
+(define (make-special-machine) (post-process (make-machine (get-registers) (get-op-list) (precompile-RML (get-RML)))))
 
 
 (define glob-mac (make-special-machine))
 (run glob-mac)
 
-;(get-register-contents glob-mac 'p-cont)
-glob-mac-cars
-glob-mac-cdrs
-;(get-register-contents test 'the-cdrs)
-;(get-register-contents test 'free)
-;(get-register-contents test 'a)
-;(get-register-contents test 'b)
-;(get-register-contents test 'c)
+;glob-mac-cars
+;glob-mac-cdrs
+;(get-register-contents glob-mac 'val)
 
-(define (iter l)
-    (if (null? l)
-        'dummy
-        (begin (newline) (display (car l)) (iter (cdr l)))))
-
-;(iter (car glob-mac))
 
