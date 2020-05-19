@@ -1,13 +1,13 @@
 (load "RM_simulator.scm")
 (load "helper-functions.scm")
-(load "5_13_RML.scm")
+(load "5_13_RML_copy.scm")
 
 
 ;#####################
 ;# VECTORS & REGISTERS
 ;#####################
 
-(define MAX_MEMORY_SIZE 50)
+(define MAX_MEMORY_SIZE 25)
 
 ;##########
 ;# POINTERS
@@ -175,7 +175,6 @@
 
 glob-mac-cars
 glob-mac-cdrs
-
-(get-register-contents glob-mac 'val)
+(get-register-contents glob-mac 'temp-val)
 
 
