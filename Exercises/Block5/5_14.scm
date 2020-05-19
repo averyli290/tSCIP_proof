@@ -1,13 +1,13 @@
 (load "RM_simulator.scm")
 (load "helper-functions.scm")
-(load "5_13_RML_copy.scm")
+(load "5_14_RML.scm")
 
 
 ;#####################
 ;# VECTORS & REGISTERS
 ;#####################
 
-(define MAX_MEMORY_SIZE 25)
+(define MAX_MEMORY_SIZE 50)
 
 ;##########
 ;# POINTERS
@@ -104,6 +104,48 @@
                         (vector-set! glob-mac-cdrs (+ f 1) base-env)
                             (make-pointer (+ f 1))))
 
+;############
+;# PRIMITIVES
+;############
+
+(define primitive-table '()) ; the same table setup, but renamed for primitives
+(define (set-primitive-table prim-name prim-proc)
+    (set! primitive-table (cons (cons prim-name prim-proc) primitive-table))) ; Adds procedure to table
+(define (set-prim-name prim-name prim-proc)
+    (cons name prim-proc))
+(define (get-prim-name expr)
+    (car expr))
+(define (get-contents expr)
+    (cdr expr))
+(define (get-primitive-table prim-name)
+    (define (inner my-table)
+        (cond ((null? my-table) 'none)
+              ((eq? (get-prim-name (car my-table)) prim-name) (get-contents (car my-table)))
+              (else (inner (cdr my-table)))))
+    (inner primitive-table))
+
+(define (primitive-apply primitive-name arglist) ; exposed in RML code as level 0 proc
+    (define (convert-to-lisp-list l pointer)
+      ; converts a pointer that points to an address in glob-mac-cars and glob-mac-cdrs (reg the-cars) and (reg the-cdrs) in the RML representation to the lisp version of the list
+        (if (null? pointer)
+            l
+            (convert-to-lisp-list (cons (vector-ref glob-mac-cars (address pointer)) l) (vector-ref glob-mac-cdrs (address pointer)))))
+    (define (reverse-list l) ; simple reverse function for a list
+        (define (iter original result)
+            (if (null? original)
+                result
+                (iter (cdr original) (cons (car original) result))))
+        (iter l '())
+        )
+    (let ((lisp-arglist (reverse-list (convert-to-lisp-list '() arglist))))
+        ; converts the pointer that points to the head of the list and then applies the primitive to it
+        (apply (get-primitive-table primitive-name) (convert-to-lisp-list '() arglist)))
+    )
+
+
+;# Adding primitives to the table
+(set-primitive-table '+ +)
+
 
 ;####################################
 ;# RML MACHINE OPS & HELPER FUNCTIONS
@@ -116,13 +158,14 @@
 (define machine-make-pointer (cons 'make-pointer make-pointer))
 (define machine-vector-ref (cons 'vector-ref (lambda (vec pointer) (vector-ref vec (address pointer)))))
 (define machine-vector-set! (cons 'vector-set! (lambda (vec pointer value) (vector-set! vec (address pointer) value))))
+(define machine-primitive-apply (cons 'primitive-apply primitive-apply))
 (define make-null (cons 'make-null (lambda () '())))
 (define increment-pointer (cons 'increment-pointer (lambda (pointer) (make-pointer (+ (address pointer) 1)))))
 (define other-ops (list (cons 'eq? eq?) (cons 'null? null?) (cons 'display display) (cons '- -) (cons '+ +) (cons '= =) (cons 'symbol? symbol?) (cons 'number? number?) (cons 'integer? integer?)))
 ; labels are just symbol in my RML simulator
 
 
-(define (get-op-list) (append (list machine-lookup-var-value machine-make-environment machine-define-var! machine-make-pointer machine-vector-ref machine-vector-set! make-null increment-pointer) other-ops)) ; returns a list of all ops to be used in special machine
+(define (get-op-list) (append (list machine-lookup-var-value machine-make-environment machine-define-var! machine-make-pointer machine-vector-ref machine-vector-set! machine-primitive-apply make-null increment-pointer) other-ops)) ; returns a list of all ops to be used in special machine
 
 
 
@@ -175,6 +218,7 @@
 
 glob-mac-cars
 glob-mac-cdrs
-(get-register-contents glob-mac 'temp-val)
+
+(get-register-contents glob-mac 'val)
 
 

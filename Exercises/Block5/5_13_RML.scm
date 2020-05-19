@@ -6,7 +6,7 @@
       (define y 12)
       ;(define x 6)
       (+ x (+ x y))
-      ;(+ 1 3)
+      (+ 1 3)
       ;x 
       ))
 
@@ -14,6 +14,20 @@
 (define (get-RML)
   '(
     (assign (reg env) (op make-environment))
+
+    ;(assign (reg temp-1) (reg null))
+    ;(assign (reg temp-1) CONS (reg null) (reg null))
+    ;(assign (reg temp-1) CONS (const 1) (reg null))
+    ;(assign (reg temp-1) CONS (const 2) (reg temp-1))
+    ;(assign (reg temp-1) CONS (const 3) (reg temp-1))
+
+    ;(assign (reg temp-2) (reg null))
+    ;(assign (reg temp-2) CONS (const 5) (reg null))
+    ;(assign (reg temp-2) CONS (const 5) (reg null))
+    ;(assign (reg temp-2) CONS (const 6) (reg temp-2))
+    ;(assign (reg temp-2) CONS (const 7) (reg temp-2))
+    
+    ;(goto (label done))
 
     eval-loop
         (test (op null?) (reg program)) ; tests if program is null
@@ -70,7 +84,7 @@
         (pop (reg exp))
         (assign (reg proc) (reg val)) ; assignined proc to result of evaluating CAR (reg exp)
         (assign (reg unev) CDR (reg exp)) ; setting arguments up for recursive evalutating
-        (assign (reg argl) CONS (reg null) (reg null))
+        (assign (reg argl) (reg null))
         (push (reg continue)) ; saving continue because ev-apply-3, ev-apply-3-rec
         (goto (label ev-apply-3-rec))
     ev-apply-3-rec
@@ -96,8 +110,7 @@
 
     apply
         (pop (reg continue))
-        (perform (op display) (reg argl))
-        (assign (reg temp-1) CADDR (reg argl))
+        (assign (reg temp-1) CAR (reg argl))
         (assign (reg temp-2) CADR (reg argl))
         (assign (reg val) (op +) (reg temp-1) (reg temp-2))
         (goto (reg continue))
@@ -123,7 +136,7 @@
         (assign (reg temp-val) CONS (reg temp-var) (reg temp-val))
         (goto (reg continue))
 
-
+    
     cons  ; inputs: p-1, p-2
         (perform (op vector-set!) (reg the-cars) (reg free) (reg p-1))
         (perform (op vector-set!) (reg the-cdrs) (reg free) (reg p-2))

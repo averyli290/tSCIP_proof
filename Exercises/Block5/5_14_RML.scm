@@ -1,12 +1,11 @@
 
 (define (the-program) ; the lisp 2 program that will be loaded into the special machine
     '(
-      13
-      ;(define + 73)
+      (define x 13)
+      (define y 12)
       ;(define x 6)
-      ;(+ 1 (+ 2 3))
-      ;(define x 13)
-      ;(define y 12)
+      ;(+ x (+ x y))
+      (+ 1 2 3)
       ;x 
       ))
 
@@ -15,22 +14,11 @@
   '(
     (assign (reg env) (op make-environment))
 
-    ;(assign (reg temp-1) (reg null))
-    ;(assign (reg temp-1) CONS (reg null) (reg null))
-    ;(assign (reg temp-1) CONS (const 1) (reg null))
-    ;(assign (reg temp-1) CONS (const 2) (reg temp-1))
-    ;(assign (reg temp-1) CONS (const 3) (reg temp-1))
-
-    ;(assign (reg temp-2) (reg null))
-    ;(assign (reg temp-2) CONS (const 5) (reg null))
-    ;(assign (reg temp-2) CONS (const 5) (reg null))
-    ;(assign (reg temp-2) CONS (const 6) (reg temp-2))
-    ;(assign (reg temp-2) CONS (const 7) (reg temp-2))
-    
-    ;(goto (label done))
-
-    (assign (reg continue) (label done))
-    (goto (label append))
+    ; setting primitives up
+    (assign (reg temp-1) (reg null))
+    (assign (reg temp-1) CONS (const +) (reg temp-1))
+    (assign (reg temp-1) CONS (const primitive) (reg temp-1))
+    (perform (op define-var!) (const +) (reg temp-1) (reg env))
 
     eval-loop
         (test (op null?) (reg program)) ; tests if program is null
@@ -50,10 +38,6 @@
         (branch (label ev-define))
 
         (goto (label ev-apply))
-        ;(assign (reg temp-1) CADR (reg exp)) ; TEMPORARY for evaluating ((define x (+ 1 3) '()) x '())
-        ;(assign (reg temp-2) CADDR (reg exp))
-        ;(assign (reg val) (op +) (reg temp-1) (reg temp-2))
-        ;(goto (reg continue))
 
     ev-self-evalutating
         (assign (reg val) (reg exp))
@@ -76,6 +60,48 @@
         (perform (op define-var!) (reg temp-var) (reg val) (reg env)) ; defining the variable with the result of the evaluated sub expression
         (goto (reg continue)) ; finally goes to continue
 
+    ev-apply ; expression goes to here when it is not a special form (self-evaluating, variable, define)
+        (push (reg exp)) ; pushing exp and continue to the stack 
+        (push (reg continue)) ; NEED to push things that are being used to stack when doing either recursive calls or subroutines to be safe
+        (assign (reg exp) CAR (reg exp)) ; evaluating the first argument of (reg exp) and putting it in (reg proc)
+        (assign (reg continue) (label ev-apply-2))
+        (goto (label eval))
+    ev-apply-2 ; the next stage of apply starts with the evaluated procedure in (reg proc) and setting up for the evaluating the arguments
+        (pop (reg continue)) ; getting the values of continue and reg back
+        (pop (reg exp))
+        (assign (reg proc) (reg val)) ; assignined proc to result of evaluating CAR (reg exp)
+        (assign (reg unev) CDR (reg exp)) ; setting arguments up for recursive evalutating
+        (assign (reg argl) (reg null)) ; assigning (reg argl) to '() at first
+        (push (reg continue)) ; saving continue because ev-apply-3, ev-apply-3-rec
+        (goto (label ev-apply-3-rec))
+    ev-apply-3-rec
+        (test (op null?) (reg unev)) ; if (reg unev) is null, done evaluating arguments so we can go to apply
+        (branch (label apply))
+        (push (reg argl)) ; pushing argl and unev to save them
+        (push (reg unev)) ; have to push (reg unev) to the stack because (reg unev) might be overidden in recursion, like in the case of (+ 1 (+ 2 3)) (the inside part overrides the outside part)
+        (assign (reg continue) (label ev-apply-3-rec-2)) ; after evaluating the first element of unev, want to go to ev-apply-3-rec
+        (assign (reg exp) CAR (reg unev))
+        (goto (label eval))
+    ev-apply-3-rec-2
+        (assign (reg val) CONS (reg val) (reg null)) ; making (reg val) into a one element list
+        (pop (reg unev)) ; getting the saved value of unev
+        (pop (reg argl)) ; getting argl from the stack
+        (assign (reg temp-1) (reg argl)) ; appending val to argl
+        (assign (reg temp-2) (reg val))
+        (assign (reg continue) (label ev-apply-3-rec-3))
+        (goto (label append))
+    ev-apply-3-rec-3
+        (assign (reg argl) (reg temp-val)) ; assigning the (reg argl) argument list to be the result of append
+        (assign (reg unev) CDR (reg unev)) ; continuing on in unev
+        (goto (label ev-apply-3-rec)) ; going back to the start of evaluating (reg unev)
+
+    apply
+        ; for this exercise, apply assumes that the procedure is primitive
+        (pop (reg continue)) ; getting continue from the stack
+        (assign (reg temp-1) CADR (reg proc)) ; get the primitive name from the pair
+        (assign (reg val) (op primitive-apply) (reg temp-1) (reg argl)) ; using the level-0 lisp here
+        (goto (reg continue))
+        
     append ; inputs: temp-1, temp-2
         (push (reg continue))
         (test (op null?) (reg temp-1))
