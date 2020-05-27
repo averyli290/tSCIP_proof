@@ -184,7 +184,8 @@
     (define (print-instructions instructions) (begin (display "Instructions") (display instructions)))
 
     (define (master-print instructions)
-        (print-current-line instructions)
+        (display "")
+        ;(print-current-line instructions)
         ;(newline)
         ;(display (get-register-contents machine 'the-cars))
         ;(newline)
@@ -217,7 +218,7 @@
             (check needs-instructions)))
 
     (define (iter-run instructions)
-        (newline)
+        ;(newline)
         (cond ((null? instructions) (set! state 'done))
               ((and (is-breakpoint? instructions) (not (eq? state 'first-line))) (begin (set! state 'breakpoint) (set-car! machine instructions)))
               ((needs-instructions? (car instructions)) (begin (master-print instructions) (set! instructions ((get-table (get-tag (car instructions))) instructions (car instructions)))))

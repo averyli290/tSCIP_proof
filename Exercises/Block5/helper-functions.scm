@@ -31,6 +31,10 @@
           (make-cadr line))
           ((eq? 'CADDR (caddr line))
           (make-caddr line))
+          ((eq? 'CADDDR (caddr line))
+          (make-cadddr line))
+          ((eq? 'CDDR (caddr line))
+          (make-cddr line))
           (else
           (list line))))
 
@@ -92,6 +96,20 @@
     (list (list 'assign dest 'CDR source)
           (list 'assign dest 'CDR dest)
           (list 'assign dest 'CAR dest))))
+
+(define (make-cadddr line) 
+    (let ((dest (cadr line))
+        (source (cadddr line)))
+    (list (list 'assign dest 'CDR source)
+          (list 'assign dest 'CDR dest)
+          (list 'assign dest 'CDR dest)
+          (list 'assign dest 'CAR dest))))
+
+(define (make-cddr line) 
+    (let ((dest (cadr line))
+        (source (cadddr line)))
+    (list (list 'assign dest 'CDR source)
+          (list 'assign dest 'CDR dest))))
 
 (define (loop-once RML)
     (fold-left append '() (map main-map RML)))
